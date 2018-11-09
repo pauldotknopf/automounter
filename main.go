@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"sync"
 
 	"github.com/pauldotknopf/automounter/providers"
@@ -14,12 +13,29 @@ import (
 var wg sync.WaitGroup
 
 func main() {
+	ctx := context.Background()
+	//ctx, _ := context.WithCancel(context.Background())
+	// go func() {
+	// 	time.Sleep(2 * time.Second)
+	// 	cancel()
+	// }()
 
 	mediaProvider := muxer.Create(providers.GetProviders())
-	server := web.Create(mediaProvider)
 
-	err := server.Listen(context.Background(), 3000)
-	if err != nil {
-		log.Println(err)
-	}
+	// Start the monitoring of media.
+	wg.Add(1)
+	go func() {
+		mediaProvider.Start(ctx)
+		wg.Done()
+	}()
+
+	// Start the web API.
+	wg.Add(1)
+	go func() {
+		server := web.Create(mediaProvider)
+		server.Listen(ctx, 3000)
+		wg.Done()
+	}()
+
+	wg.Wait()
 }

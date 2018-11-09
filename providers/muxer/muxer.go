@@ -1,6 +1,9 @@
 package muxer
 
 import (
+	"context"
+	"sync"
+
 	"github.com/pauldotknopf/automounter/providers"
 )
 
@@ -18,33 +21,16 @@ func (p *muxer) Name() string {
 	return "muxer"
 }
 
-func (p *muxer) Start() error {
-	var err error
-	started := make([]providers.MediaProvider, 0)
+func (p *muxer) Start(ctx context.Context) error {
+	var wg sync.WaitGroup
 	for _, provider := range p.p {
-		if err != nil {
-			err = provider.Start()
-			if err == nil {
-				started = append(started, provider)
-			}
-		}
+		wg.Add(1)
+		go func() {
+			provider.Start(ctx)
+			wg.Done()
+		}()
 	}
-	if err != nil {
-		// We failed to start a provider, let's stop any providers that did start
-		for _, started := range started {
-			started.Stop()
-		}
-	}
-	return err
-}
-
-func (p *muxer) Stop() error {
-	for _, provider := range p.p {
-		err := provider.Stop()
-		if err != nil {
-			return err
-		}
-	}
+	wg.Wait()
 	return nil
 }
 

@@ -1,5 +1,9 @@
 package providers
 
+import (
+	"context"
+)
+
 var providers = struct {
 	p []MediaProvider
 }{}
@@ -7,8 +11,7 @@ var providers = struct {
 // MediaProvider The type that will detect and mount media
 type MediaProvider interface {
 	Name() string
-	Start() error
-	Stop() error
+	Start(context.Context) error
 	GetMedia() []Media
 }
 
