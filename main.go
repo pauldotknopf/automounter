@@ -1,11 +1,12 @@
 package main
 
 import (
-	"fmt"
-	"os/exec"
+	_ "github.com/pauldotknopf/automounter/providers/udevil"
+
+	"github.com/pauldotknopf/automounter/web"
 )
 
 func main() {
-	fmt.Println("sdf")
-	exec.Command("udevil", "--monitor")
+	server := web.Create()
+	server.Listen()
 }
