@@ -1,9 +1,5 @@
 package providers
 
-import (
-	"fmt"
-)
-
 var providers = struct {
 	p []MediaProvider
 }{}
@@ -11,6 +7,14 @@ var providers = struct {
 // MediaProvider The type that will detect and mount media
 type MediaProvider interface {
 	Name() string
+	Start() error
+	Stop() error
+	GetMedia() []Media
+}
+
+// Media A media type that can be mounted/used.
+type Media interface {
+	ID() string
 }
 
 // AddProvider Add a provider
@@ -18,8 +22,7 @@ func AddProvider(provider MediaProvider) {
 	providers.p = append(providers.p, provider)
 }
 
-func Test() {
-	for _, provider := range providers.p {
-		fmt.Println(provider.Name())
-	}
+// GetProviders Get the current providers
+func GetProviders() []MediaProvider {
+	return providers.p
 }

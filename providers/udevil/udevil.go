@@ -5,12 +5,26 @@ import (
 )
 
 func init() {
-	providers.AddProvider(&udevilProvider{})
+	providers.AddProvider(&udevil{})
 }
 
-type udevilProvider struct {
+type udevil struct {
 }
 
-func (p *udevilProvider) Name() string {
+func (p *udevil) Name() string {
 	return "udevil"
+}
+
+func (p *udevil) Start() error {
+	return nil
+}
+
+func (p *udevil) Stop() error {
+	return nil
+}
+
+func (p *udevil) GetMedia() []providers.Media {
+	result := make([]providers.Media, 0)
+	result = append(result, udevilMedia{})
+	return result
 }
