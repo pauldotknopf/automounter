@@ -1,16 +1,14 @@
 package udevil
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io/ioutil"
-	"log"
-	"os/exec"
 	"regexp"
 	"sync"
 
 	"github.com/pauldotknopf/automounter/providers"
+	"golang.org/x/sync/errgroup"
 )
 
 func init() {
@@ -27,85 +25,91 @@ func (s *udevil) Name() string {
 }
 
 func (s *udevil) Start(ctx context.Context) error {
-	cmd := exec.Command("udevil", "--monitor")
 
-	stdout, _ := cmd.StdoutPipe()
+	g, ctx := errgroup.WithContext(ctx)
 
-	scanner := bufio.NewScanner(stdout)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
-	go func() {
-		r := regexp.MustCompile(`(changed|removed|added):\s*/org/freedesktop/UDisks/devices/(.*)`)
-		for scanner.Scan() {
-			m := scanner.Text()
-			matches := r.FindStringSubmatch(m)
-			if matches == nil {
-				continue
-			}
-			action := matches[1]
-			device := "/device/" + matches[2]
+	g.Go(func() error {
+		return monitorDevices(ctx, s.deviceAdded, s.deviceChanged, s.deviceRemoved)
+	})
 
-			if action == "changed" {
-				s.deviceChanged(device)
-			} else if action == "added" {
-				s.deviceAdded(device)
-			} else if action == "removed" {
-				s.deviceRemoved(device)
-			}
-		}
-	}()
-
-	err := cmd.Start()
-	if err != nil {
-		return err
-	}
-
+	// Look for the initially plugged in drives.
 	pluggedIndevices, err := getPluggedInDevices()
 	if err != nil {
-		cmd.Process.Kill()
+		cancel()
+		g.Wait()
 		return err
 	}
 
 	for _, device := range pluggedIndevices {
-		s.deviceAdded(device)
+		err = s.deviceAdded(device)
+		if err != nil {
+			cancel()
+			g.Wait()
+			return err
+		}
 	}
 
-	go func() {
-		<-ctx.Done()
-		cmd.Process.Kill()
-	}()
-
-	cmd.Wait()
-
-	return nil
+	return g.Wait()
 }
 
 func (s *udevil) GetMedia() []providers.Media {
 	result := make([]providers.Media, 0)
-	result = append(result, udevilMedia{})
+	for _, media := range s.devices {
+		result = append(result, media)
+	}
 	return result
 }
 
-func (s *udevil) deviceAdded(device string) {
+func (s *udevil) deviceAdded(device string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+
+	fmt.Println("added")
 
 	deviceInfo, err := getDeviceInfo(device)
 	if err != nil {
-		log.Println(err)
-		return
+		return nil
 	}
 
-	s.devices = append(s.devices, udevilMedia{deviceInfo})
+	if deviceInfo.systemInternal != "1" &&
+		deviceInfo.partition != nil {
+		// This looks like a valid device, let's add it if it isn't already present.
+		if !s.deviceExists(deviceInfo.deviceFile.file) {
+			s.devices = append(s.devices, udevilMedia{deviceInfo})
+		}
+	}
+
+	return nil
 }
 
-func (s *udevil) deviceChanged(device string) {
+func (s *udevil) deviceChanged(device string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+
+	fmt.Println("changed")
+
+	return nil
 }
 
-func (s *udevil) deviceRemoved(device string) {
+func (s *udevil) deviceRemoved(device string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+
+	fmt.Println("removed")
+
+	deviceInfo, err := getDeviceInfo(device)
+	if err != nil {
+		return err
+	}
+
+	if s.deviceExists(deviceInfo.deviceFile.file) {
+		s.removeDevice(deviceInfo.deviceFile.file)
+	}
+
+	return nil
 }
 
 func getPluggedInDevices() ([]string, error) {
@@ -123,4 +127,22 @@ func getPluggedInDevices() ([]string, error) {
 		result = append(result, fmt.Sprintf("/dev/%s", match))
 	}
 	return result, nil
+}
+
+func (s *udevil) deviceExists(deviceFile string) bool {
+	for _, device := range s.devices {
+		if device.deviceInfo.deviceFile.file == deviceFile {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *udevil) removeDevice(deviceFile string) {
+	for i := 0; i < len(s.devices); i++ {
+		if s.devices[i].deviceInfo.deviceFile.file == deviceFile {
+			s.devices = append(s.devices[:i], s.devices[i+1:]...)
+			i--
+		}
+	}
 }

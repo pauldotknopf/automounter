@@ -18,6 +18,7 @@ type MediaProvider interface {
 // Media A media type that can be mounted/used.
 type Media interface {
 	ID() string
+	DisplayName() string
 }
 
 // AddProvider Add a provider

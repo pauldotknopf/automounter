@@ -5,5 +5,9 @@ type udevilMedia struct {
 }
 
 func (s udevilMedia) ID() string {
-	return "test"
+	return s.deviceInfo.deviceFile.file
+}
+
+func (s udevilMedia) DisplayName() string {
+	return s.deviceInfo.label
 }

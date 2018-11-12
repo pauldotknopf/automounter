@@ -53,6 +53,7 @@ func (server *Server) media(w http.ResponseWriter, r *http.Request) {
 	for _, media := range server.mediaProvider.GetMedia() {
 		m := make(map[string]interface{})
 		m["id"] = media.ID()
+		m["displayName"] = media.DisplayName()
 		result = append(result, m)
 	}
 

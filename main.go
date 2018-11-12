@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/pauldotknopf/automounter/providers"
 	"github.com/pauldotknopf/automounter/providers/muxer"
@@ -13,12 +14,12 @@ import (
 var wg sync.WaitGroup
 
 func main() {
-	ctx := context.Background()
-	//ctx, _ := context.WithCancel(context.Background())
-	// go func() {
-	// 	time.Sleep(2 * time.Second)
-	// 	cancel()
-	// }()
+	//ctx := context.Background()
+	ctx, _ := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(2 * time.Second)
+		//cancel()
+	}()
 
 	mediaProvider := muxer.Create(providers.GetProviders())
 

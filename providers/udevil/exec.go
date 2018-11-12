@@ -1,8 +1,11 @@
 package udevil
 
 import (
+	"bufio"
+	"context"
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -23,7 +26,7 @@ type deviceInfoDrive struct {
 	WWN        string
 	detachable string
 	ejectable  string
-	media      deviceInfoDriveMedia
+	media      *deviceInfoDriveMedia
 	inter      string
 	ifSpeed    string
 }
@@ -40,6 +43,7 @@ type deviceInfoFile struct {
 }
 
 type deviceInfoPartition struct {
+	partition       string
 	scheme          string
 	number          string
 	partitionType   string
@@ -54,7 +58,7 @@ type deviceInfoPartition struct {
 type deviceInfo struct {
 	nativePath           string
 	device               string
-	deviceFile           deviceInfoFile
+	deviceFile           *deviceInfoFile
 	systemInternal       string
 	removable            string
 	hasMedia             string
@@ -73,9 +77,52 @@ type deviceInfo struct {
 	version              string
 	uuid                 string
 	label                string
-	partitionTable       deviceInfoPartitionTable
-	drive                deviceInfoDrive
-	partition            deviceInfoPartition
+	partitionTable       *deviceInfoPartitionTable
+	drive                *deviceInfoDrive
+	partition            *deviceInfoPartition
+}
+
+func monitorDevices(ctx context.Context,
+	added func(device string) error,
+	changed func(device string) error,
+	removed func(device string) error) error {
+	cmd := exec.Command("udevil", "--monitor")
+	cmd.Stderr = os.Stderr
+	stdout, _ := cmd.StdoutPipe()
+	scanner := bufio.NewScanner(stdout)
+
+	err := cmd.Start()
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		<-ctx.Done()
+		cmd.Process.Kill()
+	}()
+
+	r := regexp.MustCompile(`(changed|removed|added):\s*/org/freedesktop/UDisks/devices/(.*)`)
+	for scanner.Scan() {
+		m := scanner.Text()
+		matches := r.FindStringSubmatch(m)
+		if matches == nil {
+			continue
+		}
+		action := matches[1]
+		device := "/device/" + matches[2]
+
+		if action == "changed" {
+			changed(device)
+		} else if action == "added" {
+			added(device)
+		} else if action == "removed" {
+			removed(device)
+		}
+	}
+
+	cmd.Wait() // TODO: check error code
+
+	return nil
 }
 
 func getDeviceInfo(device string) (deviceInfo, error) {
@@ -113,14 +160,13 @@ func getDeviceInfo(device string) (deviceInfo, error) {
 			result.device = value
 			break
 		case "device-file":
-			var deviceFile deviceInfoFile
-			deviceFile.file = value
+			result.deviceFile = &deviceInfoFile{}
+			result.deviceFile.file = value
 			i++
 			for ; i < len(output); i++ {
 				deviceLine := output[i]
 				if !strings.HasPrefix(deviceLine, "    ") {
 					i--
-					result.deviceFile = deviceFile
 					break
 				}
 				key, value, err = getKeyValue(deviceLine)
@@ -130,10 +176,10 @@ func getDeviceInfo(device string) (deviceInfo, error) {
 				}
 				switch key {
 				case "presentation":
-					deviceFile.presentation = value
+					result.deviceFile.presentation = value
 					break
 				case "by-id":
-					deviceFile.byID = value
+					result.deviceFile.byID = value
 					break
 				default:
 					log.Println("invalid key: " + key)
@@ -196,114 +242,12 @@ func getDeviceInfo(device string) (deviceInfo, error) {
 			result.label = value
 			break
 		case "partition table":
-			var partitionTable deviceInfoPartitionTable
-			partitionTable.partitionTable = value
+			result.partitionTable = &deviceInfoPartitionTable{}
+			result.partitionTable.partitionTable = value
 			i++
-			for ; i < len(output); i++ {
-				deviceLine := output[i]
-				if !strings.HasPrefix(deviceLine, "    ") {
-					i--
-					result.partitionTable = partitionTable
-					break
-				}
-				key, value, err = getKeyValue(deviceLine)
-				if err != nil {
-					log.Println(err)
-					break
-				}
-				switch key {
-				case "scheme":
-					partitionTable.schema = value
-					break
-				case "count":
-					partitionTable.count = value
-					break
-				default:
-					log.Println("invalid key: " + key)
-					break
-				}
-			}
-			break
-		case "drive":
-			var drive deviceInfoDrive
-			drive.drive = value
-			i++
-			for ; i < len(output); i++ {
-				driveLine := output[i]
-				if !strings.HasPrefix(driveLine, "    ") {
-					i--
-					result.drive = drive
-					break
-				}
-				key, value, err = getKeyValue(driveLine)
-				if err != nil {
-					log.Println(err)
-					break
-				}
-				switch key {
-				case "vendor":
-					drive.vendor = value
-					break
-				case "model":
-					drive.model = value
-					break
-				case "revision":
-					drive.revision = value
-					break
-				case "serial":
-					drive.serial = value
-					break
-				case "WWN":
-					drive.WWN = value
-					break
-				case "detachable":
-					drive.detachable = value
-					break
-				case "ejectable":
-					drive.ejectable = value
-					break
-				case "media":
-					var media deviceInfoDriveMedia
-					media.media = value
-					i++
-					mediaLine := output[i]
-					if !strings.HasPrefix(mediaLine, "      ") {
-						i--
-						drive.media = media
-						break
-					}
-					key, value, err = getKeyValue(mediaLine)
-					if err != nil {
-						log.Println(err)
-						break
-					}
-					switch key {
-					case "compat":
-						media.compat = value
-						break
-					default:
-						log.Println("invalid key: " + key)
-						break
-					}
-					break
-				case "interface":
-					drive.inter = value
-					break
-				case "if speed":
-					drive.ifSpeed = value
-					break
-				default:
-					log.Println("invalid key: " + key)
-					break
-				}
-			}
-			break
-		case "partition":
-			var partition deviceInfoPartition
 			for ; i < len(output); i++ {
 				partitionLine := output[i]
 				if !strings.HasPrefix(partitionLine, "    ") {
-					result.partition = partition
 					i--
 					break
 				}
@@ -314,31 +258,131 @@ func getDeviceInfo(device string) (deviceInfo, error) {
 				}
 				switch key {
 				case "scheme":
-					partition.scheme = value
+					result.partitionTable.schema = value
+					break
+				case "count":
+					result.partitionTable.count = value
+					break
+				default:
+					log.Println("invalid key: " + key)
+					break
+				}
+			}
+			break
+		case "drive":
+			result.drive = &deviceInfoDrive{}
+			result.drive.drive = value
+			i++
+			for ; i < len(output); i++ {
+				driveLine := output[i]
+				if !strings.HasPrefix(driveLine, "    ") {
+					i--
+					break
+				}
+				key, value, err = getKeyValue(driveLine)
+				if err != nil {
+					log.Println(err)
+					break
+				}
+				switch key {
+				case "vendor":
+					result.drive.vendor = value
+					break
+				case "model":
+					result.drive.model = value
+					break
+				case "revision":
+					result.drive.revision = value
+					break
+				case "serial":
+					result.drive.serial = value
+					break
+				case "WWN":
+					result.drive.WWN = value
+					break
+				case "detachable":
+					result.drive.detachable = value
+					break
+				case "ejectable":
+					result.drive.ejectable = value
+					break
+				case "media":
+					result.drive.media = &deviceInfoDriveMedia{}
+					result.drive.media.media = value
+					i++
+					mediaLine := output[i]
+					if !strings.HasPrefix(mediaLine, "      ") {
+						i--
+						break
+					}
+					key, value, err = getKeyValue(mediaLine)
+					if err != nil {
+						log.Println(err)
+						break
+					}
+					switch key {
+					case "compat":
+						result.drive.media.compat = value
+						break
+					default:
+						log.Println("invalid key: " + key)
+						break
+					}
+					break
+				case "interface":
+					result.drive.inter = value
+					break
+				case "if speed":
+					result.drive.ifSpeed = value
+					break
+				default:
+					log.Println("invalid key: " + key)
+					break
+				}
+			}
+			break
+		case "partition":
+			result.partition = &deviceInfoPartition{}
+			result.partition.partition = value
+			i++
+			for ; i < len(output); i++ {
+				partitionLine := output[i]
+				if !strings.HasPrefix(partitionLine, "    ") {
+					i--
+					break
+				}
+				key, value, err = getKeyValue(partitionLine)
+				if err != nil {
+					log.Println(err)
+					break
+				}
+				switch key {
+				case "scheme":
+					result.partition.scheme = value
 					break
 				case "number":
-					partition.number = value
+					result.partition.number = value
 					break
 				case "type":
-					partition.partitionType = value
+					result.partition.partitionType = value
 					break
 				case "flags":
-					partition.flags = value
+					result.partition.flags = value
 					break
 				case "offset":
-					partition.offset = value
+					result.partition.offset = value
 					break
 				case "alignment offset":
-					partition.alignmentOffset = value
+					result.partition.alignmentOffset = value
 					break
 				case "size":
-					partition.size = value
+					result.partition.size = value
 					break
 				case "label":
-					partition.label = value
+					result.partition.label = value
 					break
 				case "uuid":
-					partition.uuid = value
+					result.partition.uuid = value
 					break
 				default:
 					log.Println("invalid key: " + key)
