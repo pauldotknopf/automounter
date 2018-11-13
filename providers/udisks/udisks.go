@@ -137,12 +137,20 @@ func (s *udisksProvider) Mount(id string) (providers.MountSession, error) {
 						if len(v) == 0 {
 							return nil, fmt.Errorf("mount indicated it was already mounted, but couldn't find the mount")
 						}
-						return &udisksMountSession{media.path, v[0]}, nil
+						session := &udisksMountSession{}
+						session.path = media.path
+						session.mountPath = v[0]
+						session.provider = s
+						return session, nil
 					}
 				}
 				return nil, err
 			}
-			return &udisksMountSession{media.path, location}, nil
+			session := &udisksMountSession{}
+			session.path = media.path
+			session.mountPath = location
+			session.provider = s
+			return session, nil
 		}
 	}
 

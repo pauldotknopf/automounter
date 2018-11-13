@@ -7,16 +7,13 @@ import (
 type udisksMountSession struct {
 	path      dbus.ObjectPath
 	mountPath string
+	provider  *udisksProvider
 }
 
 func (s *udisksMountSession) Release() error {
-	return nil
+	return s.provider.Unmount(string(s.path))
 }
 
 func (s *udisksMountSession) Location() string {
 	return s.mountPath
 }
-
-// func createMount(path, dbus.ObjectPath) (*udisksMountSession, error) {
-
-// }

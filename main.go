@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/pauldotknopf/automounter/leaser"
 
@@ -20,11 +21,10 @@ var eg errgroup.Group
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	// For testing
-	// go func() {
-	// 	time.Sleep(5 * time.Second)
-	// 	cancel()
-	// }()
+	go func() {
+		time.Sleep(5 * time.Second)
+		//cancel()
+	}()
 
 	mediaProvider := muxer.Create(providers.GetProviders())
 	leaser := leaser.Create(mediaProvider)
@@ -35,10 +35,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Start the monitoring of old leases (clean up).
+	eg.Go(func() error {
+		leaseErr := leaser.MonitorOldLeases(ctx)
+		if leaseErr != nil {
+			cancel()
+			return leaseErr
+		}
+		return nil
+	})
+
 	// Start the monitoring of media.
 	eg.Go(func() error {
 		startErr := mediaProvider.Start(ctx)
-		if err != nil {
+		if startErr != nil {
 			cancel()
 			return startErr
 		}
