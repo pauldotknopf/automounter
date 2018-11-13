@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/pauldotknopf/automounter/leaser"
+
 	"github.com/pauldotknopf/automounter/providers"
 	"github.com/pauldotknopf/automounter/providers/muxer"
 	_ "github.com/pauldotknopf/automounter/providers/udisks"
@@ -25,6 +27,7 @@ func main() {
 	// }()
 
 	mediaProvider := muxer.Create(providers.GetProviders())
+	leaser := leaser.Create(mediaProvider)
 
 	err := mediaProvider.Initialize()
 	if err != nil {
@@ -44,7 +47,7 @@ func main() {
 
 	// Start the web API.
 	eg.Go(func() error {
-		server := web.Create(mediaProvider)
+		server := web.Create(leaser)
 		serverErr := server.Listen(ctx, 3000)
 		if serverErr != nil {
 			cancel()

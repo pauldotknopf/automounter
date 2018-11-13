@@ -6,18 +6,21 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/pauldotknopf/automounter/leaser"
 	"github.com/pauldotknopf/automounter/providers"
 )
 
 // Server The web server instance
 type Server struct {
 	mediaProvider providers.MediaProvider
+	leaser        leaser.Leaser
 }
 
 // Create Create the web server
-func Create(mediaProvider providers.MediaProvider) *Server {
+func Create(leaser leaser.Leaser) *Server {
 	return &Server{
-		mediaProvider,
+		leaser.MediaProvider(),
+		leaser,
 	}
 }
 
@@ -27,6 +30,10 @@ func (server *Server) Listen(ctx context.Context, port int) error {
 	router.HandleFunc("/media", server.media).Methods("GET")
 	router.HandleFunc("/mount", server.mount).Methods("POST")
 	router.HandleFunc("/unmount", server.unmount).Methods("POST")
+
+	router.HandleFunc("/leases", server.leases).Methods("GET")
+	router.HandleFunc("/leases/create", server.leaseCreate).Methods("POST")
+	router.HandleFunc("/leases/release", server.leaseRelease).Methods("POST")
 
 	h := &http.Server{Addr: fmt.Sprintf(":%d", port), Handler: router}
 
@@ -61,7 +68,7 @@ func (server *Server) mount(w http.ResponseWriter, r *http.Request) {
 	server.getRequestBody(r, &request)
 
 	if len(request.MediaID) == 0 {
-		server.sendError(w, fmt.Errorf("no id provided"))
+		server.sendError(w, fmt.Errorf("no media id provided"))
 	}
 
 	var response mountResponse

@@ -6,7 +6,7 @@ type genericResponse struct {
 }
 
 type mountRequest struct {
-	MediaID string `json:"id"`
+	MediaID string `json:"mediaId"`
 }
 
 type mountResponse struct {
