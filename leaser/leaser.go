@@ -1,6 +1,9 @@
 package leaser
 
 import (
+	"fmt"
+	"sync"
+
 	"github.com/pauldotknopf/automounter/helpers"
 	"github.com/pauldotknopf/automounter/providers"
 )
@@ -23,14 +26,15 @@ type Leaser interface {
 type leaser struct {
 	mediaProvider providers.MediaProvider
 	media         []*mediaLease
+	lock          sync.Mutex
 }
 
 // Create a leaser object
 func Create(mediaProvider providers.MediaProvider) Leaser {
-	return &leaser{
-		mediaProvider,
-		make([]*mediaLease, 0),
-	}
+	l := &leaser{}
+	l.mediaProvider = mediaProvider
+	l.media = make([]*mediaLease, 0)
+	return l
 }
 
 func (s *leaser) MediaProvider() providers.MediaProvider {
@@ -38,6 +42,9 @@ func (s *leaser) MediaProvider() providers.MediaProvider {
 }
 
 func (s *leaser) Leases() []Lease {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	result := make([]Lease, 0)
 	for _, media := range s.media {
 		for _, lease := range media.leases {
@@ -48,6 +55,9 @@ func (s *leaser) Leases() []Lease {
 }
 
 func (s *leaser) Lease(mediaID string) (Lease, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	// Look for an existing mount for this media item.
 	for _, media := range s.media {
 		if media.mediaID == mediaID {
@@ -81,5 +91,17 @@ func (s *leaser) Lease(mediaID string) (Lease, error) {
 }
 
 func (s *leaser) Release(leaseID string) error {
-	return nil
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	// Look for an existing mount for this media item.
+	for _, media := range s.media {
+		for leaseIndex, lease := range media.leases {
+			if lease.ID() == leaseID {
+				media.leases = append(media.leases[:leaseIndex], media.leases[leaseIndex+1:]...)
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("no lease with the given id")
 }
