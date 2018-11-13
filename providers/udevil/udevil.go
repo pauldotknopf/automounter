@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"sync"
 
+	"github.com/pauldotknopf/automounter/helpers"
 	"github.com/pauldotknopf/automounter/providers"
 	"golang.org/x/sync/errgroup"
 )
@@ -61,6 +62,22 @@ func (s *udevil) GetMedia() []providers.Media {
 		result = append(result, media)
 	}
 	return result
+}
+
+func (s *udevil) Mount(media providers.Media) (providers.MountSession, error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if o, ok := media.(udevilMedia); ok {
+		if o.mountSession != nil {
+			return nil, fmt.Errorf("media is already mounted")
+		}
+		tmpPath, err := helpers.GetTmpMountPath()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return nil, fmt.Errorf("not a media type provided by udevil")
 }
 
 func (s *udevil) deviceAdded(device string) error {

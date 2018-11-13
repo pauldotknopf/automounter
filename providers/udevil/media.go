@@ -1,7 +1,12 @@
 package udevil
 
+import (
+	"github.com/pauldotknopf/automounter/providers"
+)
+
 type udevilMedia struct {
-	deviceInfo deviceInfo
+	deviceInfo   deviceInfo
+	mountSession providers.MountSession
 }
 
 func (s udevilMedia) ID() string {

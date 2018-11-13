@@ -13,6 +13,15 @@ type MediaProvider interface {
 	Name() string
 	Start(context.Context) error
 	GetMedia() []Media
+	Mount(media Media) (MountSession, error)
+}
+
+// MountSession represents a mount session for a media type
+type MountSession interface {
+	Media() Media
+	Release() error
+	// Were the media is mounted
+	Location() string
 }
 
 // Media A media type that can be mounted/used.

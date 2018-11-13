@@ -12,6 +12,7 @@ type muxer struct {
 	p []providers.MediaProvider
 }
 
+// Create a muxer from multiple providers
 func Create(p []providers.MediaProvider) providers.MediaProvider {
 	return &muxer{
 		p,

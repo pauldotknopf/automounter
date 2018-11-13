@@ -398,3 +398,7 @@ func getDeviceInfo(device string) (deviceInfo, error) {
 
 	return result, nil
 }
+
+func mountDevice(device string) error {
+
+}
