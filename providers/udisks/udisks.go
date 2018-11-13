@@ -2,14 +2,11 @@ package udisks
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 	"sync"
 
 	"github.com/godbus/dbus"
-	"github.com/godbus/dbus/introspect"
 	"github.com/pauldotknopf/automounter/providers"
 )
 
@@ -33,14 +30,6 @@ func (s *udisksProvider) Initialize() error {
 		return err
 	}
 	s.conn = conn
-
-	node, err := introspect.Call(conn.Object("org.freedesktop.UDisks2", "/org/freedesktop/UDisks2"))
-	if err != nil {
-		panic(err)
-	}
-	data, _ := json.MarshalIndent(node, "", "    ")
-	os.Stdout.Write(data)
-
 	return nil
 }
 
@@ -182,6 +171,9 @@ func (s *udisksProvider) Unmount(id string) error {
 }
 
 func (s *udisksProvider) deviceAdded(path dbus.ObjectPath, dBusObject map[string]map[string]dbus.Variant) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
 	if _, ok := dBusObject["org.freedesktop.UDisks2.Filesystem"]; ok {
 		if block, ok := dBusObject["org.freedesktop.UDisks2.Block"]; ok {
 			if hintIgnore, ok := block["HintIgnore"]; ok {
@@ -207,7 +199,16 @@ func (s *udisksProvider) deviceAdded(path dbus.ObjectPath, dBusObject map[string
 }
 
 func (s *udisksProvider) deviceRemoved(path dbus.ObjectPath) error {
-	fmt.Println(path)
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	for mediaIndex, media := range s.media {
+		if media.path == path {
+			s.media = append(s.media[:mediaIndex], s.media[mediaIndex+1:]...)
+			return nil
+		}
+	}
+
 	return nil
 }
 

@@ -1,7 +1,6 @@
 package helpers
 
 import (
-	"fmt"
 	"time"
 )
 
@@ -16,7 +15,6 @@ func Every(duration time.Duration, f func(time.Time)) chan bool {
 			case t := <-ticker.C:
 				f(t)
 			case <-done:
-				fmt.Println("done")
 				return
 			}
 		}
