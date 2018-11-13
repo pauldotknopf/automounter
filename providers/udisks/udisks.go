@@ -14,8 +14,6 @@ var (
 	interfaceAdded = ""
 )
 
-type dBusObject map[string]map[string]dbus.Variant
-
 func init() {
 	providers.AddProvider(&udisksProvider{})
 }
@@ -102,6 +100,9 @@ func (s *udisksProvider) Start(ctx context.Context) error {
 
 func (s *udisksProvider) GetMedia() []providers.Media {
 	result := make([]providers.Media, 0)
+	for _, media := range s.media {
+		result = append(result, &media)
+	}
 	return result
 }
 
@@ -112,8 +113,8 @@ func (s *udisksProvider) Mount(media providers.Media) (providers.MountSession, e
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (s *udisksProvider) deviceAdded(path dbus.ObjectPath, dBusObject dBusObject) error {
-	if fileSystem, ok := dBusObject["org.freedesktop.UDisks2.Filesystem"]; ok {
+func (s *udisksProvider) deviceAdded(path dbus.ObjectPath, dBusObject map[string]map[string]dbus.Variant) error {
+	if _, ok := dBusObject["org.freedesktop.UDisks2.Filesystem"]; ok {
 		if block, ok := dBusObject["org.freedesktop.UDisks2.Block"]; ok {
 			if hintIgnore, ok := block["HintIgnore"]; ok {
 				if hintIgnore.Value() == true {
@@ -124,8 +125,10 @@ func (s *udisksProvider) deviceAdded(path dbus.ObjectPath, dBusObject dBusObject
 			}
 			if hintIgnore, ok := block["HintAuto"]; ok {
 				if hintIgnore.Value() == true {
-					fmt.Println(path)
-					_ = fileSystem
+					// Add this device
+					if !s.hasObject(path) {
+						s.media = append(s.media, udisksMedia{path, dBusObject})
+					}
 				}
 			} else {
 				return nil
@@ -137,5 +140,32 @@ func (s *udisksProvider) deviceAdded(path dbus.ObjectPath, dBusObject dBusObject
 
 func (s *udisksProvider) deviceRemoved(path dbus.ObjectPath) error {
 	fmt.Println(path)
+	return nil
+}
+
+func (s *udisksProvider) hasObject(path dbus.ObjectPath) bool {
+	for _, media := range s.media {
+		if media.path == path {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *udisksProvider) removeObject(path dbus.ObjectPath) {
+	for i := 0; i < len(s.media); i++ {
+		if s.media[i].path == path {
+			s.media = append(s.media[:i], s.media[i+1:]...)
+			i--
+		}
+	}
+}
+
+func (s *udisksProvider) getObject(path dbus.ObjectPath) *udisksMedia {
+	for i := 0; i < len(s.media); i++ {
+		if s.media[i].path == path {
+			return &s.media[i]
+		}
+	}
 	return nil
 }
