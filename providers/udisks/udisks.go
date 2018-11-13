@@ -2,23 +2,26 @@ package udisks
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 	"sync"
 
 	"github.com/godbus/dbus"
-	"github.com/godbus/dbus/introspect"
 	"github.com/pauldotknopf/automounter/providers"
 )
+
+var (
+	interfaceAdded = ""
+)
+
+type dBusObject map[string]map[string]dbus.Variant
 
 func init() {
 	providers.AddProvider(&udisksProvider{})
 }
 
 type udisksProvider struct {
-	conn  dbus.Conn
+	conn  *dbus.Conn
 	mutex sync.Mutex
 	media []udisksMedia
 }
@@ -40,66 +43,61 @@ func (s *udisksProvider) Start(ctx context.Context) error {
 
 	udisks := s.conn.Object("org.freedesktop.UDisks2", "/org/freedesktop/UDisks2")
 
-	// Get the current objects
+	udisks.AddMatchSignal("org.freedesktop.DBus.ObjectManager", "InterfacesAdded")
+	udisks.AddMatchSignal("org.freedesktop.DBus.ObjectManager", "InterfacesRemoved")
+	ch := make(chan *dbus.Signal, 5)
+	s.conn.Signal(ch)
+
+	// Before we start processing events, let's process drives that may already be plugged in.
 	var result map[dbus.ObjectPath]map[string]map[string]dbus.Variant
 	o := udisks.Call("org.freedesktop.DBus.ObjectManager.GetManagedObjects", 0)
 	err := o.Store(&result)
 	if err != nil {
 		return err
 	}
-	for k := range result {
-		err = s.deviceAdded(k)
+
+	for path := range result {
+		err := s.deviceAdded(path, result[path])
 		if err != nil {
-			return err
+			log.Println(err)
 		}
-		// for k2, v2 := range v {
-		// 	fmt.Println(k2)
-		// 	for k3, v3 := range v2 {
-		// 		fmt.Println(k3)
-		// 		fmt.Println(v3.Value())
-		// 	}
-		// }
-		// if strings.HasPrefix(string(k), "") {
-		// 	// This is a block device
-		// 	s.deviceAdded(k)
-		// 	o2 := conn.Object("org.freedesktop.UDisks2", k)
-		// 	node, err := introspect.Call(o2)
-		// 	if err != nil {
-		// 		log.Println(err)
-		// 		panic(err)
-		// 	}
-		// 	data, _ := json.MarshalIndent(node, "", "    ")
-		// 	os.Stdout.Write(data)
-		// 	fmt.Println(string(k))
-		// }
 	}
 
-	node, err := introspect.Call(conn.Object("org.freedesktop.DBus.ObjectManager", "/org/freedesktop/UDisks2"))
-	if err != nil {
-		log.Println(err)
-		panic(err)
+	go func() {
+		<-ctx.Done()
+		s.conn.RemoveSignal(ch)
+		udisks.AddMatchSignal("org.freedesktop.DBus.ObjectManager", "InterfacesAdded")
+		udisks.AddMatchSignal("org.freedesktop.DBus.ObjectManager", "InterfacesRemoved")
+		close(ch)
+	}()
+
+	for {
+		sig := <-ch
+		if sig == nil {
+			// Channel was closed
+			break
+		}
+
+		path := sig.Body[0].(dbus.ObjectPath)
+
+		switch sig.Name {
+		case "org.freedesktop.DBus.ObjectManager.InterfacesAdded":
+			obj, _ := sig.Body[1].(map[string]map[string]dbus.Variant)
+			err = s.deviceAdded(path, obj)
+			if err != nil {
+				log.Println(err)
+			}
+			break
+		case "org.freedesktop.DBus.ObjectManager.InterfacesRemoved":
+			err = s.deviceRemoved(path)
+			if err != nil {
+				log.Println(err)
+			}
+			break
+		}
 	}
-	data, _ := json.MarshalIndent(node, "", "    ")
-	os.Stdout.Write(data)
+
 	return nil
-	// conn, err := dbus.SessionBus()
-	// if err != nil {
-	// 	return err
-	// }
-
-	// conn.BusObject()
-
-	// conn.AddMatchSignal("/org/freedesktop/UDisks2", "object-added")
-
-	// c := make(chan *dbus.Signal, 10)
-	// conn.Signal(c)
-
-	// for v := range c {
-	// 	fmt.Println(v)
-	// }
-
-	// fmt.Println(obj)
-	// return nil
 }
 
 func (s *udisksProvider) GetMedia() []providers.Media {
@@ -114,6 +112,30 @@ func (s *udisksProvider) Mount(media providers.Media) (providers.MountSession, e
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (s *udisksProvider) deviceAdded(devicePath dbus.ObjectPath) error {
+func (s *udisksProvider) deviceAdded(path dbus.ObjectPath, dBusObject dBusObject) error {
+	if fileSystem, ok := dBusObject["org.freedesktop.UDisks2.Filesystem"]; ok {
+		if block, ok := dBusObject["org.freedesktop.UDisks2.Block"]; ok {
+			if hintIgnore, ok := block["HintIgnore"]; ok {
+				if hintIgnore.Value() == true {
+					return nil
+				}
+			} else {
+				return nil
+			}
+			if hintIgnore, ok := block["HintAuto"]; ok {
+				if hintIgnore.Value() == true {
+					fmt.Println(path)
+					_ = fileSystem
+				}
+			} else {
+				return nil
+			}
+		}
+	}
+	return nil
+}
+
+func (s *udisksProvider) deviceRemoved(path dbus.ObjectPath) error {
+	fmt.Println(path)
 	return nil
 }

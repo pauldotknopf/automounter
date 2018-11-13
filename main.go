@@ -2,11 +2,9 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
-	"time"
 
 	"github.com/pauldotknopf/automounter/providers"
 	"github.com/pauldotknopf/automounter/providers/muxer"
@@ -20,15 +18,26 @@ var eg errgroup.Group
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	// For testing
+	// go func() {
+	// 	time.Sleep(5 * time.Second)
+	// 	cancel()
+	// }()
 
 	mediaProvider := muxer.Create(providers.GetProviders())
 
+	err := mediaProvider.Initialize()
+	if err != nil {
+		log.Println(err)
+		os.Exit(1)
+	}
+
 	// Start the monitoring of media.
 	eg.Go(func() error {
-		err := mediaProvider.Start(ctx)
+		startErr := mediaProvider.Start(ctx)
 		if err != nil {
 			cancel()
-			return err
+			return startErr
 		}
 		return nil
 	})
@@ -36,10 +45,10 @@ func main() {
 	// Start the web API.
 	eg.Go(func() error {
 		server := web.Create(mediaProvider)
-		err := server.Listen(ctx, 3000)
-		if err != nil {
+		serverErr := server.Listen(ctx, 3000)
+		if serverErr != nil {
 			cancel()
-			return err
+			return serverErr
 		}
 		return nil
 	})
@@ -49,12 +58,10 @@ func main() {
 	signal.Notify(c, os.Interrupt)
 	go func() {
 		<-c
-		fmt.Println("got signal")
-		time.Sleep(time.Second * 2)
 		cancel()
 	}()
 
-	err := eg.Wait()
+	err = eg.Wait()
 	if err != nil {
 		log.Println(err)
 		os.Exit(1)
