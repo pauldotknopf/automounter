@@ -2,7 +2,6 @@ package muxer
 
 import (
 	"context"
-	"fmt"
 
 	"golang.org/x/sync/errgroup"
 
@@ -61,6 +60,16 @@ func (s *muxer) GetMedia() []providers.Media {
 	return result
 }
 
-func (s *muxer) Mount(media providers.Media) (providers.MountSession, error) {
-	return nil, fmt.Errorf("not implemented")
+func (s *muxer) Mount(id string) (providers.MountSession, error) {
+	for _, provider := range s.p {
+		session, err := provider.Mount(id)
+		if err == providers.ErrIDNotFound {
+			continue
+		}
+		if err == nil {
+			return session, nil
+		}
+		return nil, err
+	}
+	return nil, providers.ErrIDNotFound
 }

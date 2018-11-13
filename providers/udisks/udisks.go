@@ -2,11 +2,14 @@ package udisks
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"sync"
 
 	"github.com/godbus/dbus"
+	"github.com/godbus/dbus/introspect"
 	"github.com/pauldotknopf/automounter/providers"
 )
 
@@ -30,6 +33,14 @@ func (s *udisksProvider) Initialize() error {
 		return err
 	}
 	s.conn = conn
+
+	node, err := introspect.Call(conn.Object("org.freedesktop.UDisks2", "/org/freedesktop/UDisks2"))
+	if err != nil {
+		panic(err)
+	}
+	data, _ := json.MarshalIndent(node, "", "    ")
+	os.Stdout.Write(data)
+
 	return nil
 }
 
@@ -106,11 +117,36 @@ func (s *udisksProvider) GetMedia() []providers.Media {
 	return result
 }
 
-func (s *udisksProvider) Mount(media providers.Media) (providers.MountSession, error) {
+func (s *udisksProvider) Mount(id string) (providers.MountSession, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	return nil, fmt.Errorf("not implemented")
+	for _, media := range s.media {
+		if media.ID() == id {
+			obj := s.conn.Object("org.freedesktop.UDisks2", media.path)
+			var params map[string]dbus.Variant
+			var location string
+			err := obj.Call("org.freedesktop.UDisks2.Filesystem.Mount", 0, params).Store(&location)
+			if err != nil {
+				if dbusError, ok := err.(dbus.Error); ok {
+					if dbusError.Name == "org.freedesktop.UDisks2.Error.AlreadyMounted" {
+						v, err := getPropertyStringArray(s.conn, media.path, "org.freedesktop.UDisks2.Filesystem.MountPoints")
+						if err != nil {
+							return nil, err
+						}
+						if len(v) == 0 {
+							return nil, fmt.Errorf("mount indicated it was already mounted, but couldn't find the mount")
+						}
+						return &udisksMountSession{media.path, v[0]}, nil
+					}
+				}
+				return nil, err
+			}
+			return &udisksMountSession{media.path, location}, nil
+		}
+	}
+
+	return nil, providers.ErrIDNotFound
 }
 
 func (s *udisksProvider) deviceAdded(path dbus.ObjectPath, dBusObject map[string]map[string]dbus.Variant) error {

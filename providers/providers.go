@@ -2,6 +2,12 @@ package providers
 
 import (
 	"context"
+	"errors"
+)
+
+var (
+	// ErrIDNotFound An error indicating the given id wasn't found
+	ErrIDNotFound = errors.New("Item not found")
 )
 
 var providers = struct {
@@ -14,12 +20,11 @@ type MediaProvider interface {
 	Name() string
 	Start(context.Context) error
 	GetMedia() []Media
-	Mount(media Media) (MountSession, error)
+	Mount(id string) (MountSession, error)
 }
 
 // MountSession represents a mount session for a media type
 type MountSession interface {
-	Media() Media
 	Release() error
 	// Were the media is mounted
 	Location() string

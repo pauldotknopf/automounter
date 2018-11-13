@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -27,6 +28,7 @@ func Create(mediaProvider providers.MediaProvider) *Server {
 func (server *Server) Listen(ctx context.Context, port int) error {
 	var router = mux.NewRouter()
 	router.HandleFunc("/media", server.media).Methods("GET")
+	router.HandleFunc("/mount", server.mount).Methods("POST")
 
 	h := &http.Server{Addr: fmt.Sprintf(":%d", port), Handler: router}
 
@@ -44,9 +46,6 @@ func (server *Server) Listen(ctx context.Context, port int) error {
 }
 
 func (server *Server) media(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	w.Header().Set("Content-Type", "application/json")
-
 	result := make([]map[string]interface{}, 0)
 
 	for _, media := range server.mediaProvider.GetMedia() {
@@ -56,6 +55,51 @@ func (server *Server) media(w http.ResponseWriter, r *http.Request) {
 		result = append(result, m)
 	}
 
-	j, _ := json.Marshal(result)
+	server.sendResponse(w, http.StatusBadRequest, result)
+}
+
+func (server *Server) mount(w http.ResponseWriter, r *http.Request) {
+	var request mountRequest
+	server.getRequestBody(r, &request)
+
+	if len(request.MediaID) == 0 {
+		server.sendError(w, fmt.Errorf("no id provided"))
+	}
+
+	var response mountResponse
+
+	session, err := server.mediaProvider.Mount(request.MediaID)
+	if err != nil {
+		response.Success = false
+		response.Message = err.Error()
+		server.sendResponse(w, http.StatusBadRequest, response)
+		return
+	}
+
+	response.Success = true
+	response.Location = session.Location()
+	server.sendResponse(w, http.StatusOK, response)
+}
+
+func (server *Server) getRequestBody(r *http.Request, request interface{}) error {
+	j, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(j, request)
+}
+
+func (server *Server) sendError(w http.ResponseWriter, err error) {
+	var response genericResponse
+	response.Success = false
+	response.Message = err.Error()
+	server.sendResponse(w, http.StatusBadRequest, response)
+}
+
+func (server *Server) sendResponse(w http.ResponseWriter, statusCode int, response interface{}) {
+	w.WriteHeader(statusCode)
+	w.Header().Set("Content-Type", "application/json")
+
+	j, _ := json.Marshal(response)
 	io.WriteString(w, string(j))
 }
