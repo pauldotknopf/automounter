@@ -2,7 +2,8 @@ package muxer
 
 import (
 	"context"
-	"sync"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/pauldotknopf/automounter/providers"
 )
@@ -22,16 +23,22 @@ func (p *muxer) Name() string {
 }
 
 func (p *muxer) Start(ctx context.Context) error {
-	var wg sync.WaitGroup
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var eg errgroup.Group
 	for _, provider := range p.p {
-		wg.Add(1)
-		go func() {
-			provider.Start(ctx)
-			wg.Done()
-		}()
+		eg.Go(func() error {
+			err := provider.Start(ctx)
+			if err != nil {
+				cancel()
+				return err
+			}
+			return nil
+		})
 	}
-	wg.Wait()
-	return nil
+
+	return eg.Wait()
 }
 
 func (p *muxer) GetMedia() []providers.Media {

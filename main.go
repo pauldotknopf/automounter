@@ -18,7 +18,6 @@ import (
 var eg errgroup.Group
 
 func main() {
-	//ctx := context.Background()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
