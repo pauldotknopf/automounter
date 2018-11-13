@@ -10,6 +10,7 @@ var providers = struct {
 
 // MediaProvider The type that will detect and mount media
 type MediaProvider interface {
+	Initialize() error
 	Name() string
 	Start(context.Context) error
 	GetMedia() []Media

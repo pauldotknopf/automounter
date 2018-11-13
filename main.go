@@ -10,7 +10,7 @@ import (
 
 	"github.com/pauldotknopf/automounter/providers"
 	"github.com/pauldotknopf/automounter/providers/muxer"
-	_ "github.com/pauldotknopf/automounter/providers/udevil"
+	_ "github.com/pauldotknopf/automounter/providers/udisks"
 	"github.com/pauldotknopf/automounter/web"
 	"golang.org/x/sync/errgroup"
 )
