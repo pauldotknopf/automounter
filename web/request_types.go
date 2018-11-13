@@ -13,3 +13,11 @@ type mountResponse struct {
 	genericResponse
 	Location string `json:"location"`
 }
+
+type unmountRequest struct {
+	MediaID string `json:"id"`
+}
+
+type unmountResponse struct {
+	genericResponse
+}

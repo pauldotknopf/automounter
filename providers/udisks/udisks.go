@@ -149,6 +149,30 @@ func (s *udisksProvider) Mount(id string) (providers.MountSession, error) {
 	return nil, providers.ErrIDNotFound
 }
 
+func (s *udisksProvider) Unmount(id string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	for _, media := range s.media {
+		if media.ID() == id {
+			obj := s.conn.Object("org.freedesktop.UDisks2", media.path)
+			var params map[string]dbus.Variant
+			err := obj.Call("org.freedesktop.UDisks2.Filesystem.Unmount", 0, params).Store()
+			if err != nil {
+				if dbusError, ok := err.(dbus.Error); ok {
+					if dbusError.Name == "org.freedesktop.UDisks2.Error.NotMounted" {
+						return nil
+					}
+				}
+				return err
+			}
+			return nil
+		}
+	}
+
+	return providers.ErrIDNotFound
+}
+
 func (s *udisksProvider) deviceAdded(path dbus.ObjectPath, dBusObject map[string]map[string]dbus.Variant) error {
 	if _, ok := dBusObject["org.freedesktop.UDisks2.Filesystem"]; ok {
 		if block, ok := dBusObject["org.freedesktop.UDisks2.Block"]; ok {

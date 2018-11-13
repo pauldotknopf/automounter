@@ -21,6 +21,7 @@ type MediaProvider interface {
 	Start(context.Context) error
 	GetMedia() []Media
 	Mount(id string) (MountSession, error)
+	Unmount(id string) error
 }
 
 // MountSession represents a mount session for a media type

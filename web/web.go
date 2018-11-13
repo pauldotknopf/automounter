@@ -2,10 +2,7 @@ package web
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -29,6 +26,7 @@ func (server *Server) Listen(ctx context.Context, port int) error {
 	var router = mux.NewRouter()
 	router.HandleFunc("/media", server.media).Methods("GET")
 	router.HandleFunc("/mount", server.mount).Methods("POST")
+	router.HandleFunc("/unmount", server.unmount).Methods("POST")
 
 	h := &http.Server{Addr: fmt.Sprintf(":%d", port), Handler: router}
 
@@ -81,25 +79,24 @@ func (server *Server) mount(w http.ResponseWriter, r *http.Request) {
 	server.sendResponse(w, http.StatusOK, response)
 }
 
-func (server *Server) getRequestBody(r *http.Request, request interface{}) error {
-	j, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		return err
+func (server *Server) unmount(w http.ResponseWriter, r *http.Request) {
+	var request unmountRequest
+	server.getRequestBody(r, &request)
+
+	if len(request.MediaID) == 0 {
+		server.sendError(w, fmt.Errorf("no id provided"))
 	}
-	return json.Unmarshal(j, request)
-}
 
-func (server *Server) sendError(w http.ResponseWriter, err error) {
-	var response genericResponse
-	response.Success = false
-	response.Message = err.Error()
-	server.sendResponse(w, http.StatusBadRequest, response)
-}
+	var response unmountResponse
 
-func (server *Server) sendResponse(w http.ResponseWriter, statusCode int, response interface{}) {
-	w.WriteHeader(statusCode)
-	w.Header().Set("Content-Type", "application/json")
+	err := server.mediaProvider.Unmount(request.MediaID)
+	if err != nil {
+		response.Success = false
+		response.Message = err.Error()
+		server.sendResponse(w, http.StatusBadRequest, response)
+		return
+	}
 
-	j, _ := json.Marshal(response)
-	io.WriteString(w, string(j))
+	response.Success = true
+	server.sendResponse(w, http.StatusOK, response)
 }

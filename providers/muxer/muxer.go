@@ -73,3 +73,14 @@ func (s *muxer) Mount(id string) (providers.MountSession, error) {
 	}
 	return nil, providers.ErrIDNotFound
 }
+
+func (s *muxer) Unmount(id string) error {
+	for _, provider := range s.p {
+		err := provider.Unmount(id)
+		if err == providers.ErrIDNotFound {
+			continue
+		}
+		return err
+	}
+	return providers.ErrIDNotFound
+}
