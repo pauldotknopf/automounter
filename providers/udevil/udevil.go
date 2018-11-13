@@ -67,8 +67,6 @@ func (s *udevil) deviceAdded(device string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	fmt.Println("added")
-
 	deviceInfo, err := getDeviceInfo(device)
 	if err != nil {
 		return nil
@@ -89,16 +87,12 @@ func (s *udevil) deviceChanged(device string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	fmt.Println("changed")
-
 	return nil
 }
 
 func (s *udevil) deviceRemoved(device string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-
-	fmt.Println("removed")
 
 	deviceInfo, err := getDeviceInfo(device)
 	if err != nil {

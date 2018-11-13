@@ -32,7 +32,6 @@ func (server *Server) Listen(ctx context.Context, port int) error {
 
 	go func() {
 		<-ctx.Done()
-		fmt.Println("Shutting down the HTTP server...")
 		h.Shutdown(ctx)
 	}()
 
