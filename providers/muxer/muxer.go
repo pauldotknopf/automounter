@@ -2,6 +2,7 @@ package muxer
 
 import (
 	"context"
+	"sync"
 
 	"golang.org/x/sync/errgroup"
 
@@ -83,4 +84,82 @@ func (s *muxer) Unmount(id string) error {
 		return err
 	}
 	return providers.ErrIDNotFound
+}
+
+func (s *muxer) MediaAddded() (<-chan providers.Media, func()) {
+	out := make(chan providers.Media)
+
+	type pairStruct struct {
+		in   <-chan providers.Media
+		canc func()
+	}
+	pairs := make([]pairStruct, 0)
+
+	var wg sync.WaitGroup
+
+	cancel := func() {
+		for _, p := range pairs {
+			p.canc()
+		}
+		wg.Wait()
+		close(out)
+	}
+
+	for _, p := range s.p {
+		mediaAddedChannel, mediaAddedCancel := p.MediaAddded()
+		pairs = append(pairs, pairStruct{mediaAddedChannel, mediaAddedCancel})
+	}
+
+	// Start goroutines for all the inbound channels
+	// to send them to the single outbound
+	for _, p := range pairs {
+		wg.Add(1)
+		go func(pair pairStruct) {
+			defer wg.Done()
+			for m := range pair.in {
+				out <- m
+			}
+		}(p)
+	}
+
+	return out, cancel
+}
+
+func (s *muxer) MediaRemoved() (<-chan string, func()) {
+	out := make(chan string)
+
+	type pairStruct struct {
+		in   <-chan string
+		canc func()
+	}
+	pairs := make([]pairStruct, 0)
+
+	var wg sync.WaitGroup
+
+	cancel := func() {
+		for _, p := range pairs {
+			p.canc()
+		}
+		wg.Wait()
+		close(out)
+	}
+
+	for _, p := range s.p {
+		mediaRemovedChannel, mediaRemovedCancel := p.MediaRemoved()
+		pairs = append(pairs, pairStruct{mediaRemovedChannel, mediaRemovedCancel})
+	}
+
+	// Start goroutines for all the inbound channels
+	// to send them to the single outbound
+	for _, p := range pairs {
+		wg.Add(1)
+		go func(pair pairStruct) {
+			defer wg.Done()
+			for m := range pair.in {
+				out <- m
+			}
+		}(p)
+	}
+
+	return out, cancel
 }

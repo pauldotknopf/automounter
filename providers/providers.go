@@ -22,6 +22,8 @@ type MediaProvider interface {
 	GetMedia() []Media
 	Mount(id string) (MountSession, error)
 	Unmount(id string) error
+	MediaAddded() (<-chan Media, func())
+	MediaRemoved() (<-chan string, func())
 }
 
 // MountSession represents a mount session for a media type

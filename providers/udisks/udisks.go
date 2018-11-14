@@ -6,12 +6,10 @@ import (
 	"log"
 	"sync"
 
+	"github.com/olebedev/emitter"
+
 	"github.com/godbus/dbus"
 	"github.com/pauldotknopf/automounter/providers"
-)
-
-var (
-	interfaceAdded = ""
 )
 
 func init() {
@@ -21,7 +19,8 @@ func init() {
 type udisksProvider struct {
 	conn  *dbus.Conn
 	mutex sync.Mutex
-	media []udisksMedia
+	media []*udisksMedia
+	emit  *emitter.Emitter
 }
 
 func (s *udisksProvider) Initialize() error {
@@ -30,6 +29,11 @@ func (s *udisksProvider) Initialize() error {
 		return err
 	}
 	s.conn = conn
+	s.emit = &emitter.Emitter{}
+	s.emit.Use("*", emitter.Void)
+
+	//s.emit.On()
+
 	return nil
 }
 
@@ -101,7 +105,7 @@ func (s *udisksProvider) Start(ctx context.Context) error {
 func (s *udisksProvider) GetMedia() []providers.Media {
 	result := make([]providers.Media, 0)
 	for _, media := range s.media {
-		result = append(result, &media)
+		result = append(result, media)
 	}
 	return result
 }
@@ -170,6 +174,30 @@ func (s *udisksProvider) Unmount(id string) error {
 	return providers.ErrIDNotFound
 }
 
+func (s *udisksProvider) MediaAddded() (<-chan providers.Media, func()) {
+	out := make(chan providers.Media)
+	in := s.emit.On("mediaAdded", func(event *emitter.Event) {
+		out <- event.Args[0].(providers.Media)
+	})
+	cancel := func() {
+		s.emit.Off("mediaAdded", in)
+		close(out)
+	}
+	return out, cancel
+}
+
+func (s *udisksProvider) MediaRemoved() (<-chan string, func()) {
+	out := make(chan string)
+	in := s.emit.On("mediaRemoved", func(event *emitter.Event) {
+		out <- event.String(0)
+	})
+	cancel := func() {
+		s.emit.Off("mediaRemoved", in)
+		close(out)
+	}
+	return out, cancel
+}
+
 func (s *udisksProvider) deviceAdded(path dbus.ObjectPath, dBusObject map[string]map[string]dbus.Variant) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -187,7 +215,9 @@ func (s *udisksProvider) deviceAdded(path dbus.ObjectPath, dBusObject map[string
 				if hintIgnore.Value() == true {
 					// Add this device
 					if !s.hasObject(path) {
-						s.media = append(s.media, udisksMedia{path, dBusObject})
+						m := &udisksMedia{path, dBusObject}
+						s.media = append(s.media, m)
+						s.emit.Emit("mediaAdded", m)
 					}
 				}
 			} else {
@@ -205,6 +235,7 @@ func (s *udisksProvider) deviceRemoved(path dbus.ObjectPath) error {
 	for mediaIndex, media := range s.media {
 		if media.path == path {
 			s.media = append(s.media[:mediaIndex], s.media[mediaIndex+1:]...)
+			s.emit.Emit("mediaRemoved", string(path))
 			return nil
 		}
 	}
@@ -233,7 +264,7 @@ func (s *udisksProvider) removeObject(path dbus.ObjectPath) {
 func (s *udisksProvider) getObject(path dbus.ObjectPath) *udisksMedia {
 	for i := 0; i < len(s.media); i++ {
 		if s.media[i].path == path {
-			return &s.media[i]
+			return s.media[i]
 		}
 	}
 	return nil
