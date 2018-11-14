@@ -38,6 +38,7 @@ func (server *Server) leases(w http.ResponseWriter, r *http.Request) {
 		l["leaseId"] = lease.ID()
 		l["mediaId"] = lease.MediaID()
 		l["mountPath"] = lease.MountPath()
+		l["isValid"] = lease.IsValid()
 		response.Leases = append(response.Leases, l)
 	}
 

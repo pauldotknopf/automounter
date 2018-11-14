@@ -35,9 +35,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Start the monitoring of old leases (clean up).
+	// Start the processing of leases.
 	eg.Go(func() error {
-		leaseErr := leaser.MonitorOldLeases(ctx)
+		leaseErr := leaser.Process(ctx)
 		if leaseErr != nil {
 			cancel()
 			return leaseErr

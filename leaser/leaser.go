@@ -15,6 +15,7 @@ type Lease interface {
 	ID() string
 	MediaID() string
 	MountPath() string
+	IsValid() bool
 }
 
 // Leaser The type that manages leases for media items
@@ -23,13 +24,14 @@ type Leaser interface {
 	Leases() []Lease
 	Lease(mediaID string) (Lease, error)
 	Release(leaseID string) error
-	MonitorOldLeases(ctx context.Context) error
+	Process(ctx context.Context) error
 }
 
 type leaser struct {
-	mediaProvider providers.MediaProvider
-	media         []*mediaLease
-	lock          sync.Mutex
+	mediaProvider     providers.MediaProvider
+	media             []*mediaLease
+	invalidatedLeases []*mediaLeaseItem
+	lock              sync.Mutex
 }
 
 // Create a leaser object
@@ -67,6 +69,7 @@ func (s *leaser) Lease(mediaID string) (Lease, error) {
 			// This item currently is mounted, just add a lease.
 			lease := &mediaLeaseItem{}
 			lease.media = media
+			lease.mediaItemID = mediaID
 			lease.leaseID = helpers.RandString(10)
 			media.leases = append(media.leases, lease)
 			return lease, nil
@@ -87,6 +90,7 @@ func (s *leaser) Lease(mediaID string) (Lease, error) {
 	// Add one lease to the media item.
 	lease := &mediaLeaseItem{}
 	lease.media = media
+	lease.mediaItemID = mediaID
 	lease.leaseID = helpers.RandString(10)
 	media.leases = append(media.leases, lease)
 
@@ -107,21 +111,44 @@ func (s *leaser) Release(leaseID string) error {
 			}
 		}
 	}
+
+	// We didn't find an active lease with the given ID,
+	// but maybe it was removed because the device was
+	// removed?
+	for invalidatedLeaseIndex, invalidatedLease := range s.invalidatedLeases {
+		if invalidatedLease.leaseID == leaseID {
+			s.invalidatedLeases = append(s.invalidatedLeases[:invalidatedLeaseIndex], s.invalidatedLeases[invalidatedLeaseIndex+1:]...)
+			return nil
+		}
+	}
+
 	return fmt.Errorf("no lease with the given id")
 }
 
-func (s *leaser) MonitorOldLeases(ctx context.Context) error {
+func (s *leaser) Process(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	// Every so often, clean up the leases.
 	ticker := helpers.Every(time.Millisecond*50, func(t time.Time) {
 		s.cleanLeases()
 	})
+
+	var wg sync.WaitGroup
+	chIn, chCancel := s.MediaProvider().MediaRemoved()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for m := range chIn {
+			s.deviceRemoved(m)
+		}
+	}()
 
 	// Wait until the caller wants us to return.
 	<-ctx.Done()
 
 	close(ticker)
+	chCancel()
 
 	return nil
 }
@@ -149,4 +176,22 @@ func (s *leaser) cleanLeases() error {
 		}
 	}
 	return nil
+}
+
+func (s *leaser) deviceRemoved(mediaID string) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	// If there are any leases associated with this
+	// media item, we need to invalidate them.
+	for mediaIndex, media := range s.media {
+		if media.mediaID == mediaID {
+			for _, lease := range media.leases {
+				lease.media = nil
+				s.invalidatedLeases = append(s.invalidatedLeases, lease)
+			}
+			s.media = append(s.media[:mediaIndex], s.media[mediaIndex+1:]...)
+			return
+		}
+	}
 }

@@ -17,8 +17,9 @@ type mediaLease struct {
 }
 
 type mediaLeaseItem struct {
-	leaseID string
-	media   *mediaLease
+	leaseID     string
+	mediaItemID string
+	media       *mediaLease
 }
 
 func (s *mediaLeaseItem) ID() string {
@@ -31,4 +32,8 @@ func (s *mediaLeaseItem) MediaID() string {
 
 func (s *mediaLeaseItem) MountPath() string {
 	return s.media.Location()
+}
+
+func (s *mediaLeaseItem) IsValid() bool {
+	return s.media != nil
 }
