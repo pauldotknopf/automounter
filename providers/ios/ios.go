@@ -2,10 +2,14 @@ package ios
 
 import (
 	"context"
+	"fmt"
+	"log"
 	"sync"
 
 	"github.com/olebedev/emitter"
 	"github.com/pauldotknopf/automounter/providers"
+	"github.com/pauldotknopf/goidevice/idevice"
+	"github.com/pauldotknopf/goidevice/lockdown"
 )
 
 type iosProvider struct {
@@ -26,7 +30,54 @@ func (s *iosProvider) Name() string {
 }
 
 func (s *iosProvider) Start(ctx context.Context) error {
+	// Attach an event handler to monitor for iOS events.
+	events, eventsCancel := idevice.AddEvent()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for event := range events {
+			fmt.Println(event.UUID)
+			device, err := idevice.New(event.UUID)
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			defer device.Close()
+			uuid, err := device.UUID()
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			log.Println(uuid)
+			lockdown, err := lockdown.NewClient(device, "lockdown")
+			if err != nil {
+				log.Println(err)
+			}
+			defer lockdown.Close()
+			t, err := lockdown.Type()
+			if err != nil {
+				log.Println(err)
+			}
+			fmt.Println(t)
+			err = lockdown.Pair()
+			if err != nil {
+				log.Println(err)
+			}
+		}
+	}()
+
+	// Start raising events.
+	idevice.Subscribe()
+
 	<-ctx.Done()
+
+	// Remove our event handler and stop monitoring for events.
+	eventsCancel()
+	idevice.Unsubscribe()
+	wg.Wait()
+
 	return nil
 }
 
