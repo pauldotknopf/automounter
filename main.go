@@ -9,9 +9,9 @@ import (
 
 	"github.com/pauldotknopf/automounter/leaser"
 
-	"github.com/pauldotknopf/automounter/providers"
+	"github.com/pauldotknopf/automounter/providers/ios"
 	"github.com/pauldotknopf/automounter/providers/muxer"
-	_ "github.com/pauldotknopf/automounter/providers/udisks"
+	"github.com/pauldotknopf/automounter/providers/udisks"
 	"github.com/pauldotknopf/automounter/web"
 	"golang.org/x/sync/errgroup"
 )
@@ -26,14 +26,18 @@ func main() {
 		//cancel()
 	}()
 
-	mediaProvider := muxer.Create(providers.GetProviders())
-	leaser := leaser.Create(mediaProvider)
-
-	err := mediaProvider.Initialize()
+	udisksProvider, err := udisks.Create()
 	if err != nil {
 		log.Println(err)
 		os.Exit(1)
 	}
+	iosProvider, err := ios.Create()
+	if err != nil {
+		log.Println(err)
+		os.Exit(1)
+	}
+	mediaProvider := muxer.Create(udisksProvider, iosProvider)
+	leaser := leaser.Create(mediaProvider)
 
 	// Start the processing of leases.
 	eg.Go(func() error {

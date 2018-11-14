@@ -2,6 +2,7 @@ package muxer
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"golang.org/x/sync/errgroup"
@@ -14,20 +15,10 @@ type muxer struct {
 }
 
 // Create a muxer from multiple providers
-func Create(p []providers.MediaProvider) providers.MediaProvider {
+func Create(p ...providers.MediaProvider) providers.MediaProvider {
 	return &muxer{
 		p,
 	}
-}
-
-func (s *muxer) Initialize() error {
-	for _, provider := range s.p {
-		err := provider.Initialize()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (s *muxer) Name() string {
@@ -40,8 +31,10 @@ func (s *muxer) Start(ctx context.Context) error {
 
 	var eg errgroup.Group
 	for _, provider := range s.p {
+		p := provider
 		eg.Go(func() error {
-			err := provider.Start(ctx)
+			fmt.Println("starting " + p.Name())
+			err := p.Start(ctx)
 			if err != nil {
 				cancel()
 				return err

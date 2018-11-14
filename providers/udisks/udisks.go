@@ -12,10 +12,6 @@ import (
 	"github.com/pauldotknopf/automounter/providers"
 )
 
-func init() {
-	providers.AddProvider(&udisksProvider{})
-}
-
 type udisksProvider struct {
 	conn  *dbus.Conn
 	mutex sync.Mutex
@@ -23,18 +19,20 @@ type udisksProvider struct {
 	emit  *emitter.Emitter
 }
 
-func (s *udisksProvider) Initialize() error {
+// Create a udisks block device media provider
+func Create() (providers.MediaProvider, error) {
+	p := &udisksProvider{}
+
 	conn, err := dbus.SystemBus()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	s.conn = conn
-	s.emit = &emitter.Emitter{}
-	s.emit.Use("*", emitter.Void)
 
-	//s.emit.On()
+	p.conn = conn
+	p.emit = &emitter.Emitter{}
+	p.emit.Use("*", emitter.Void)
 
-	return nil
+	return p, nil
 }
 
 func (s *udisksProvider) Name() string {
