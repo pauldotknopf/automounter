@@ -21,9 +21,3 @@ func (s *udisksMedia) DisplayName() string {
 	}
 	return s.ID()
 }
-
-// Media A media type that can be mounted/used.
-type Media interface {
-	ID() string
-	DisplayName() string
-}

@@ -3,18 +3,20 @@ package ios
 import (
 	"context"
 	"fmt"
-	"log"
 	"sync"
 
 	"github.com/olebedev/emitter"
 	"github.com/pauldotknopf/automounter/providers"
 	"github.com/pauldotknopf/goidevice/idevice"
+	"github.com/pauldotknopf/goidevice/installation"
 	"github.com/pauldotknopf/goidevice/lockdown"
+	"github.com/pauldotknopf/goidevice/plist"
 )
 
 type iosProvider struct {
-	mutex sync.Mutex
-	emit  *emitter.Emitter
+	mutex   sync.Mutex
+	emit    *emitter.Emitter
+	devices []*iosMedia
 }
 
 // Create a media provider for iOS devices
@@ -38,32 +40,13 @@ func (s *iosProvider) Start(ctx context.Context) error {
 	go func() {
 		defer wg.Done()
 		for event := range events {
-			fmt.Println(event.UUID)
-			device, err := idevice.New(event.UUID)
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-			defer device.Close()
-			uuid, err := device.UUID()
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-			log.Println(uuid)
-			lockdown, err := lockdown.NewClient(device, "lockdown")
-			if err != nil {
-				log.Println(err)
-			}
-			defer lockdown.Close()
-			t, err := lockdown.Type()
-			if err != nil {
-				log.Println(err)
-			}
-			fmt.Println(t)
-			err = lockdown.Pair()
-			if err != nil {
-				log.Println(err)
+			switch event.Event {
+			case idevice.DeviceAdded:
+				s.deviceAdded(event.UUID)
+				break
+			case idevice.DeviceRemoved:
+				s.deviceRemoved(event.UUID)
+				break
 			}
 		}
 	}()
@@ -83,6 +66,9 @@ func (s *iosProvider) Start(ctx context.Context) error {
 
 func (s *iosProvider) GetMedia() []providers.Media {
 	result := make([]providers.Media, 0)
+	for _, device := range s.devices {
+		result = append(result, device)
+	}
 	return result
 }
 
@@ -122,4 +108,102 @@ func (s *iosProvider) MediaRemoved() (<-chan string, func()) {
 		close(out)
 	}
 	return out, cancel
+}
+
+func (s *iosProvider) deviceAdded(uuid string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	device, err := idevice.New(uuid)
+	if err != nil {
+		return err
+	}
+	defer device.Close()
+
+	lockdown, err := lockdown.NewClientWithHandshake(device, "automounter")
+	if err != nil {
+		return err
+	}
+	defer lockdown.Close()
+
+	deviceName, err := lockdown.DeviceName()
+	if err != nil {
+		return err
+	}
+
+	instProxy, err := installation.NewClientStartService(device, "automounter")
+	if err != nil {
+		return err
+	}
+	defer instProxy.Close()
+
+	// Make sure the device has our app installed before we show it.
+	// NOTE: THE FOLLOWING ISN'T USEFUL TO ANYONE OTHER THAN MEDXCHANGE.
+
+	options := plist.Create()
+	defer options.Free()
+	options.SetItem("ApplicationType", "User")
+	returnValues := plist.CreateArray()
+	defer returnValues.Free()
+	returnValues.Append("CFBundleIdentifier")
+	options.SetItem("ReturnAttributes", returnValues)
+
+	apps, err := instProxy.Browse(options)
+	if err != nil {
+		return err
+	}
+	defer apps.Free()
+
+	arraySize := apps.ArraySize()
+	for i := 0; i < arraySize; i++ {
+		item := apps.ArrayItem(i)
+		fmt.Println(item.Type())
+		bundleID := item.GetItem("CFBundleIdentifier")
+		bundleIDString := bundleID.String()
+		if bundleIDString == "com.medxchange.ackbar" {
+			if !s.hasDevice(uuid) {
+				media := &iosMedia{}
+				media.deviceName = deviceName
+				media.uuid = uuid
+				s.devices = append(s.devices, media)
+				s.emit.Emit("mediaAdded", media)
+				return nil
+			}
+		}
+	}
+
+	return nil
+}
+
+func (s *iosProvider) deviceRemoved(uuid string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	for deviceIndex, device := range s.devices {
+		if device.uuid == uuid {
+			s.devices = append(s.devices[:deviceIndex], s.devices[deviceIndex+1:]...)
+			s.emit.Emit("mediaRemoved", uuid)
+			return nil
+		}
+	}
+
+	return nil
+}
+
+func (s *iosProvider) hasDevice(uuid string) bool {
+	for _, device := range s.devices {
+		if device.uuid == uuid {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *iosProvider) removeDevice(uuid string) {
+	for i := 0; i < len(s.devices); i++ {
+		if s.devices[i].uuid == uuid {
+			s.devices = append(s.devices[:i], s.devices[i+1:]...)
+			i--
+		}
+	}
 }
