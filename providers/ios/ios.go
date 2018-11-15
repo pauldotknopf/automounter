@@ -2,8 +2,11 @@ package ios
 
 import (
 	"context"
-	"fmt"
+	"os"
+	"os/exec"
 	"sync"
+
+	"github.com/pauldotknopf/automounter/helpers"
 
 	"github.com/olebedev/emitter"
 	"github.com/pauldotknopf/automounter/providers"
@@ -17,6 +20,7 @@ type iosProvider struct {
 	mutex   sync.Mutex
 	emit    *emitter.Emitter
 	devices []*iosMedia
+	mounts  []*iosMountPoint
 }
 
 // Create a media provider for iOS devices
@@ -76,12 +80,63 @@ func (s *iosProvider) Mount(id string) (providers.MountSession, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
+	// Check to see if the device is already mounted
+	for _, mount := range s.mounts {
+		if mount.uuid == id {
+			return &iosMountPoint{id, mount.path, s}, nil
+		}
+	}
+
+	// Look for the device to try to mount it
+	for _, device := range s.devices {
+		if device.uuid == id {
+			// We are trying to mount this device
+			mount := &iosMountPoint{}
+			mount.uuid = id
+			mountPath, err := helpers.GetTmpMountPath()
+			if err != nil {
+				return nil, err
+			}
+			mount.path = mountPath
+			mount.provider = s
+
+			cmd := exec.Command("ifuse", mount.path, "-u", mount.uuid, "--documents", "com.medxchange.ackbar")
+			err = cmd.Run()
+			if err != nil {
+				os.RemoveAll(mountPath)
+				return nil, err
+			}
+
+			s.mounts = append(s.mounts, mount)
+
+			return mount, nil
+		}
+	}
+
 	return nil, providers.ErrIDNotFound
 }
 
 func (s *iosProvider) Unmount(id string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+
+	// Check to see if it is already mounted
+	for mountIndex, mount := range s.mounts {
+		if mount.uuid == id {
+			// This item is currently mounted.
+			// First, remove it from the array.
+			s.mounts = append(s.mounts[:mountIndex], s.mounts[mountIndex+1:]...)
+
+			// Now, let's try to unmount is.
+			cmd := exec.Command("fusermount", "-u", mount.path)
+			err := cmd.Run()
+			if err != nil {
+				return err
+			}
+
+			return os.RemoveAll(mount.path)
+		}
+	}
 
 	return providers.ErrIDNotFound
 }
@@ -157,7 +212,6 @@ func (s *iosProvider) deviceAdded(uuid string) error {
 	arraySize := apps.ArraySize()
 	for i := 0; i < arraySize; i++ {
 		item := apps.ArrayItem(i)
-		fmt.Println(item.Type())
 		bundleID := item.GetItem("CFBundleIdentifier")
 		bundleIDString := bundleID.String()
 		if bundleIDString == "com.medxchange.ackbar" {

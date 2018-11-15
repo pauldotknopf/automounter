@@ -2,7 +2,6 @@ package muxer
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"golang.org/x/sync/errgroup"
@@ -33,7 +32,6 @@ func (s *muxer) Start(ctx context.Context) error {
 	for _, provider := range s.p {
 		p := provider
 		eg.Go(func() error {
-			fmt.Println("starting " + p.Name())
 			err := p.Start(ctx)
 			if err != nil {
 				cancel()

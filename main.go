@@ -72,7 +72,7 @@ func main() {
 
 	// When quit signal comes in, stop everything
 	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
+	signal.Notify(c, os.Interrupt, os.Kill)
 	go func() {
 		<-c
 		cancel()
