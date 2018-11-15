@@ -27,6 +27,15 @@ type smbTestResponse struct {
 	IsValid bool `json:"isValid"`
 }
 
+type smbAddRequest struct {
+	smbTestRequest
+}
+
+type smbAddResponse struct {
+	genericResponse
+	MediaID string `json:"mediaId"`
+}
+
 func (server *Server) smb(w http.ResponseWriter, r *http.Request) {
 	var response smbResponse
 	response.Success = true
@@ -60,6 +69,35 @@ func (server *Server) smbTest(w http.ResponseWriter, r *http.Request) {
 		response.IsValid = false
 	} else {
 		response.IsValid = true
+	}
+
+	server.sendResponse(w, http.StatusOK, response)
+}
+
+func (server *Server) smbAdd(w http.ResponseWriter, r *http.Request) {
+
+	var request smbAddRequest
+	var response smbAddResponse
+
+	err := server.getRequestBody(r, &request)
+	if err != nil {
+		server.sendError(w, err)
+		return
+	}
+
+	options, err := smb.CreateOptions(request.Server, request.Share, request.Folder, request.Security, request.Secure, request.Domain, request.Username, request.Password)
+	if err != nil {
+		response.Message = err.Error()
+		response.Success = false
+	} else {
+		media, err := server.smbProvider.AddMedia(options)
+		if err != nil {
+			response.Message = err.Error()
+			response.Success = false
+		} else {
+			response.MediaID = media.ID()
+			response.Success = true
+		}
 	}
 
 	server.sendResponse(w, http.StatusOK, response)

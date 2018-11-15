@@ -1,13 +1,8 @@
 package smb
 
 type smbMedia struct {
-	id       string
-	server   string
-	share    string
-	folder   string
-	secure   bool
-	username string
-	password string
+	id      string
+	options Options
 }
 
 func (s *smbMedia) ID() string {
@@ -26,11 +21,18 @@ func (s *smbMedia) Provider() string {
 func (s *smbMedia) Properties() map[string]string {
 	result := make(map[string]string, 0)
 
-	result["server"] = s.server
-	result["share"] = s.share
-	result["folder"] = s.folder
-	result["username"] = s.username
-	result["password"] = s.password
+	result["server"] = s.options.Server
+	result["share"] = s.options.Share
+	result["folder"] = s.options.Folder
+	result["security"] = s.options.Security
+	if s.options.Secure {
+		result["secure"] = "true"
+	} else {
+		result["secure"] = "false"
+	}
+	result["domain"] = s.options.Domain
+	result["username"] = s.options.Username
+	result["password"] = s.options.Password
 
 	return result
 }

@@ -27,6 +27,8 @@ type smbProvider struct {
 type Provider interface {
 	providers.MediaProvider
 	TestConnection(options Options) error
+	AddMedia(options Options) (providers.Media, error)
+	RemoveMedia(mediaID string) error
 }
 
 // Create a udisks block device media provider
@@ -125,6 +127,46 @@ func (s *smbProvider) TestConnection(options Options) error {
 	}
 
 	return nil
+}
+
+func (s *smbProvider) AddMedia(options Options) (providers.Media, error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	// First, let's see if these options resemble a media item
+	// that is already present.
+	for _, media := range s.media {
+		if media.options.Hash == options.Hash {
+			// Just act as if we added it.
+			return media, nil
+		}
+	}
+
+	// Add it as a new item.
+	media := &smbMedia{}
+	media.id = fmt.Sprintf("smb-%s", options.Hash)
+	media.options = options
+	s.media = append(s.media, media)
+	s.emit.Emit("mediaAdded", media)
+
+	return media, nil
+}
+
+func (s *smbProvider) RemoveMedia(mediaID string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	// First, let's see if these options resemble a media item
+	// that is already present.
+	for mediaIndex, media := range s.media {
+		if media.id == mediaID {
+			s.media = append(s.media[:mediaIndex], s.media[mediaIndex+1:]...)
+			s.emit.Emit("mediaRemoved", mediaID)
+			return nil
+		}
+	}
+
+	return providers.ErrIDNotFound
 }
 
 func extractErrorsFromMountOutput(output string) string {

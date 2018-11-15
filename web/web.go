@@ -41,6 +41,7 @@ func (server *Server) Listen(ctx context.Context, port int) error {
 	if server.smbProvider != nil {
 		router.HandleFunc("/smb", server.smb).Methods("GET")
 		router.HandleFunc("/smb/test", server.smbTest).Methods("POST")
+		router.HandleFunc("/smb/add", server.smbAdd).Methods("POST")
 	}
 
 	h := &http.Server{Addr: fmt.Sprintf(":%d", port), Handler: router}
