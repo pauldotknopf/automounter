@@ -5,6 +5,8 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+
+	"github.com/pauldotknopf/automounter/providers"
 )
 
 func (server *Server) getRequestBody(r *http.Request, request interface{}) error {
@@ -28,4 +30,19 @@ func (server *Server) sendResponse(w http.ResponseWriter, statusCode int, respon
 
 	j, _ := json.Marshal(response)
 	io.WriteString(w, string(j))
+}
+
+func convertMediaToMap(media []providers.Media) []map[string]interface{} {
+	result := make([]map[string]interface{}, 0)
+
+	for _, media := range media {
+		m := make(map[string]interface{})
+		m["id"] = media.ID()
+		m["displayName"] = media.DisplayName()
+		m["provider"] = media.Provider()
+		m["properties"] = media.Properties()
+		result = append(result, m)
+	}
+
+	return result
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/pauldotknopf/automounter/providers/ios"
 	"github.com/pauldotknopf/automounter/providers/muxer"
+	"github.com/pauldotknopf/automounter/providers/smb"
 	"github.com/pauldotknopf/automounter/providers/udisks"
 	"github.com/pauldotknopf/automounter/web"
 	"golang.org/x/sync/errgroup"
@@ -36,7 +37,12 @@ func main() {
 		log.Println(err)
 		os.Exit(1)
 	}
-	mediaProvider := muxer.Create(udisksProvider, iosProvider)
+	smbProvider, err := smb.Create()
+	if err != nil {
+		log.Println(err)
+		os.Exit(1)
+	}
+	mediaProvider := muxer.Create(udisksProvider, iosProvider, smbProvider)
 	leaser := leaser.Create(mediaProvider)
 
 	// Start the processing of leases.
@@ -61,7 +67,7 @@ func main() {
 
 	// Start the web API.
 	eg.Go(func() error {
-		server := web.Create(leaser)
+		server := web.Create(leaser, smbProvider)
 		serverErr := server.Listen(ctx, 3000)
 		if serverErr != nil {
 			cancel()

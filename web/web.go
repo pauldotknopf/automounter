@@ -8,19 +8,22 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/pauldotknopf/automounter/leaser"
 	"github.com/pauldotknopf/automounter/providers"
+	"github.com/pauldotknopf/automounter/providers/smb"
 )
 
 // Server The web server instance
 type Server struct {
 	mediaProvider providers.MediaProvider
 	leaser        leaser.Leaser
+	smbProvider   smb.Provider
 }
 
 // Create Create the web server
-func Create(leaser leaser.Leaser) *Server {
+func Create(leaser leaser.Leaser, smbProvider smb.Provider) *Server {
 	return &Server{
 		leaser.MediaProvider(),
 		leaser,
+		smbProvider,
 	}
 }
 
@@ -34,6 +37,11 @@ func (server *Server) Listen(ctx context.Context, port int) error {
 	router.HandleFunc("/leases", server.leases).Methods("GET")
 	router.HandleFunc("/leases/create", server.leaseCreate).Methods("POST")
 	router.HandleFunc("/leases/release", server.leaseRelease).Methods("POST")
+
+	if server.smbProvider != nil {
+		router.HandleFunc("/smb", server.smb).Methods("GET")
+		router.HandleFunc("/smb/test", server.smbTest).Methods("POST")
+	}
 
 	h := &http.Server{Addr: fmt.Sprintf(":%d", port), Handler: router}
 
@@ -51,18 +59,7 @@ func (server *Server) Listen(ctx context.Context, port int) error {
 }
 
 func (server *Server) media(w http.ResponseWriter, r *http.Request) {
-	result := make([]map[string]interface{}, 0)
-
-	for _, media := range server.mediaProvider.GetMedia() {
-		m := make(map[string]interface{})
-		m["id"] = media.ID()
-		m["displayName"] = media.DisplayName()
-		m["provider"] = media.Provider()
-		m["properties"] = media.Properties()
-		result = append(result, m)
-	}
-
-	server.sendResponse(w, http.StatusBadRequest, result)
+	server.sendResponse(w, http.StatusOK, convertMediaToMap(server.mediaProvider.GetMedia()))
 }
 
 func (server *Server) mount(w http.ResponseWriter, r *http.Request) {
