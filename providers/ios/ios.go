@@ -120,25 +120,7 @@ func (s *iosProvider) Unmount(id string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	// Check to see if it is already mounted
-	for mountIndex, mount := range s.mounts {
-		if mount.uuid == id {
-			// This item is currently mounted.
-			// First, remove it from the array.
-			s.mounts = append(s.mounts[:mountIndex], s.mounts[mountIndex+1:]...)
-
-			// Now, let's try to unmount is.
-			cmd := exec.Command("fusermount", "-u", mount.path)
-			err := cmd.Run()
-			if err != nil {
-				return err
-			}
-
-			return os.RemoveAll(mount.path)
-		}
-	}
-
-	return providers.ErrIDNotFound
+	return s.unmount(id)
 }
 
 func (s *iosProvider) MediaAddded() (<-chan providers.Media, func()) {
@@ -233,15 +215,23 @@ func (s *iosProvider) deviceRemoved(uuid string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
+	// First, let's unmount the device (if it is already)
+	err := s.unmount(uuid)
+	if err == providers.ErrIDNotFound {
+		err = nil
+	}
+
 	for deviceIndex, device := range s.devices {
 		if device.uuid == uuid {
 			s.devices = append(s.devices[:deviceIndex], s.devices[deviceIndex+1:]...)
 			s.emit.Emit("mediaRemoved", uuid)
-			return nil
+			// Return the mounting error, if there were any
+			return err
 		}
 	}
 
-	return nil
+	// Return the mounting error, if there were any
+	return err
 }
 
 func (s *iosProvider) hasDevice(uuid string) bool {
@@ -260,4 +250,27 @@ func (s *iosProvider) removeDevice(uuid string) {
 			i--
 		}
 	}
+}
+
+func (s *iosProvider) unmount(id string) error {
+
+	// Check to see if it is already mounted
+	for mountIndex, mount := range s.mounts {
+		if mount.uuid == id {
+			// This item is currently mounted.
+			// First, remove it from the array.
+			s.mounts = append(s.mounts[:mountIndex], s.mounts[mountIndex+1:]...)
+
+			// Now, let's try to unmount is.
+			cmd := exec.Command("fusermount", "-u", mount.path)
+			err := cmd.Run()
+			if err != nil {
+				return err
+			}
+
+			return os.RemoveAll(mount.path)
+		}
+	}
+
+	return providers.ErrIDNotFound
 }
