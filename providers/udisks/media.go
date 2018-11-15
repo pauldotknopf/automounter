@@ -21,3 +21,18 @@ func (s *udisksMedia) DisplayName() string {
 	}
 	return s.ID()
 }
+
+func (s *udisksMedia) Provider() string {
+	return "udisks"
+}
+
+func (s *udisksMedia) Properties() map[string]string {
+	result := make(map[string]string, 0)
+
+	if block, ok := s.object["org.freedesktop.UDisks2.Block"]; ok {
+		result["fsType"] = block["IdType"].Value().(string)
+		result["size"] = string(block["Size"].Value().(uint64))
+	}
+
+	return result
+}

@@ -12,3 +12,11 @@ func (s *iosMedia) ID() string {
 func (s *iosMedia) DisplayName() string {
 	return s.deviceName
 }
+
+func (s *iosMedia) Provider() string {
+	return "ios"
+}
+
+func (s *iosMedia) Properties() map[string]string {
+	return make(map[string]string, 0)
+}

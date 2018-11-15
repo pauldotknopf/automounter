@@ -32,4 +32,6 @@ type MountSession interface {
 type Media interface {
 	ID() string
 	DisplayName() string
+	Provider() string
+	Properties() map[string]string
 }

@@ -57,6 +57,8 @@ func (server *Server) media(w http.ResponseWriter, r *http.Request) {
 		m := make(map[string]interface{})
 		m["id"] = media.ID()
 		m["displayName"] = media.DisplayName()
+		m["provider"] = media.Provider()
+		m["properties"] = media.Properties()
 		result = append(result, m)
 	}
 
