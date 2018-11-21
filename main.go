@@ -4,10 +4,13 @@ import (
 	"context"
 	"log"
 	"os"
-	"os/signal"
-	"time"
+
+	"github.com/coreos/go-systemd/journal"
+	"github.com/sirupsen/logrus"
+	"github.com/wercker/journalhook"
 
 	"github.com/pauldotknopf/automounter/leaser"
+	"github.com/pauldotknopf/automounter/utils/appcontext"
 
 	"github.com/pauldotknopf/automounter/providers/ios"
 	"github.com/pauldotknopf/automounter/providers/muxer"
@@ -20,12 +23,12 @@ import (
 var eg errgroup.Group
 
 func main() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go func() {
-		time.Sleep(5 * time.Second)
-		//cancel()
-	}()
+
+	if journal.Enabled() {
+		logrus.AddHook(&journalhook.JournalHook{})
+	}
+
+	ctx, cancel := context.WithCancel(appcontext.Context())
 
 	udisksProvider, err := udisks.Create()
 	if err != nil {
@@ -75,14 +78,6 @@ func main() {
 		}
 		return nil
 	})
-
-	// When quit signal comes in, stop everything
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, os.Kill)
-	go func() {
-		<-c
-		cancel()
-	}()
 
 	err = eg.Wait()
 	if err != nil {
