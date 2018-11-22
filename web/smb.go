@@ -36,6 +36,14 @@ type smbAddResponse struct {
 	MediaID string `json:"mediaId"`
 }
 
+type smbRemoveRequest struct {
+	MediaID string `json:"mediaId"`
+}
+
+type smbRemoveResponse struct {
+	genericResponse
+}
+
 func (server *Server) smb(w http.ResponseWriter, r *http.Request) {
 	var response smbResponse
 	response.Success = true
@@ -98,6 +106,28 @@ func (server *Server) smbAdd(w http.ResponseWriter, r *http.Request) {
 			response.MediaID = media.ID()
 			response.Success = true
 		}
+	}
+
+	server.sendResponse(w, http.StatusOK, response)
+}
+
+func (server *Server) smbRemove(w http.ResponseWriter, r *http.Request) {
+
+	var request smbRemoveRequest
+	var response smbRemoveResponse
+
+	err := server.getRequestBody(r, &request)
+	if err != nil {
+		server.sendError(w, err)
+		return
+	}
+
+	err = server.smbProvider.RemoveMedia(request.MediaID)
+	if err != nil {
+		response.Success = false
+		response.Message = err.Error()
+	} else {
+		response.Success = true
 	}
 
 	server.sendResponse(w, http.StatusOK, response)
