@@ -87,6 +87,11 @@ func CreateOptions(server string, share string, folder string, security string, 
 	return result, nil
 }
 
+// FriendlyName .
+func (s Options) FriendlyName() string {
+	return fmt.Sprintf("//%s/%s", s.Server, s.Share)
+}
+
 // MountCommand The shell command to mount these options
 func (s Options) MountCommand(mountPoint string) string {
 	var opts bytes.Buffer

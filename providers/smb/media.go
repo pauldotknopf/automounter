@@ -10,8 +10,7 @@ func (s *smbMedia) ID() string {
 }
 
 func (s *smbMedia) DisplayName() string {
-	// TODO: return network/share
-	return s.id
+	return s.options.FriendlyName()
 }
 
 func (s *smbMedia) Provider() string {
