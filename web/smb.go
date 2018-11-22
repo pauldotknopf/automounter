@@ -47,8 +47,8 @@ type smbRemoveResponse struct {
 func (server *Server) smb(w http.ResponseWriter, r *http.Request) {
 	var response smbResponse
 	response.Success = true
-	response.Entries = convertMediaToMap(server.smbProvider.GetMedia())
-	server.sendResponse(w, http.StatusOK, response)
+	response.Entries = convertMediaArrayToJSON(server.smbProvider.GetMedia())
+	sendResponse(w, http.StatusOK, response)
 }
 
 func (server *Server) smbTest(w http.ResponseWriter, r *http.Request) {
@@ -56,9 +56,9 @@ func (server *Server) smbTest(w http.ResponseWriter, r *http.Request) {
 	var request smbTestRequest
 	var response smbTestResponse
 
-	err := server.getRequestBody(r, &request)
+	err := getRequestBody(r, &request)
 	if err != nil {
-		server.sendError(w, err)
+		sendError(w, err)
 		return
 	}
 
@@ -67,7 +67,7 @@ func (server *Server) smbTest(w http.ResponseWriter, r *http.Request) {
 
 	options, err := smb.CreateOptions(request.Server, request.Share, request.Folder, request.Security, request.Secure, request.Domain, request.Username, request.Password)
 	if err != nil {
-		server.sendError(w, err)
+		sendError(w, err)
 		return
 	}
 
@@ -79,7 +79,7 @@ func (server *Server) smbTest(w http.ResponseWriter, r *http.Request) {
 		response.IsValid = true
 	}
 
-	server.sendResponse(w, http.StatusOK, response)
+	sendResponse(w, http.StatusOK, response)
 }
 
 func (server *Server) smbAdd(w http.ResponseWriter, r *http.Request) {
@@ -87,9 +87,9 @@ func (server *Server) smbAdd(w http.ResponseWriter, r *http.Request) {
 	var request smbAddRequest
 	var response smbAddResponse
 
-	err := server.getRequestBody(r, &request)
+	err := getRequestBody(r, &request)
 	if err != nil {
-		server.sendError(w, err)
+		sendError(w, err)
 		return
 	}
 
@@ -108,7 +108,7 @@ func (server *Server) smbAdd(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	server.sendResponse(w, http.StatusOK, response)
+	sendResponse(w, http.StatusOK, response)
 }
 
 func (server *Server) smbRemove(w http.ResponseWriter, r *http.Request) {
@@ -116,9 +116,9 @@ func (server *Server) smbRemove(w http.ResponseWriter, r *http.Request) {
 	var request smbRemoveRequest
 	var response smbRemoveResponse
 
-	err := server.getRequestBody(r, &request)
+	err := getRequestBody(r, &request)
 	if err != nil {
-		server.sendError(w, err)
+		sendError(w, err)
 		return
 	}
 
@@ -130,5 +130,5 @@ func (server *Server) smbRemove(w http.ResponseWriter, r *http.Request) {
 		response.Success = true
 	}
 
-	server.sendResponse(w, http.StatusOK, response)
+	sendResponse(w, http.StatusOK, response)
 }

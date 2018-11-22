@@ -34,6 +34,8 @@ func (server *Server) Listen(ctx context.Context, port int) error {
 	router.HandleFunc("/mount", server.mount).Methods("POST")
 	router.HandleFunc("/unmount", server.unmount).Methods("POST")
 
+	router.HandleFunc("/events", server.events)
+
 	router.HandleFunc("/leases", server.leases).Methods("GET")
 	router.HandleFunc("/leases/create", server.leaseCreate).Methods("POST")
 	router.HandleFunc("/leases/release", server.leaseRelease).Methods("POST")
@@ -61,15 +63,16 @@ func (server *Server) Listen(ctx context.Context, port int) error {
 }
 
 func (server *Server) media(w http.ResponseWriter, r *http.Request) {
-	server.sendResponse(w, http.StatusOK, convertMediaToMap(server.mediaProvider.GetMedia()))
+	sendResponse(w, http.StatusOK, convertMediaArrayToJSON(server.mediaProvider.GetMedia()))
 }
 
 func (server *Server) mount(w http.ResponseWriter, r *http.Request) {
 	var request mountRequest
-	server.getRequestBody(r, &request)
+	getRequestBody(r, &request)
 
 	if len(request.MediaID) == 0 {
-		server.sendError(w, fmt.Errorf("no media id provided"))
+		sendError(w, fmt.Errorf("no media id provided"))
+		return
 	}
 
 	var response mountResponse
@@ -78,21 +81,22 @@ func (server *Server) mount(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		response.Success = false
 		response.Message = err.Error()
-		server.sendResponse(w, http.StatusBadRequest, response)
+		sendResponse(w, http.StatusBadRequest, response)
 		return
 	}
 
 	response.Success = true
 	response.Location = session.Location()
-	server.sendResponse(w, http.StatusOK, response)
+	sendResponse(w, http.StatusOK, response)
 }
 
 func (server *Server) unmount(w http.ResponseWriter, r *http.Request) {
 	var request unmountRequest
-	server.getRequestBody(r, &request)
+	getRequestBody(r, &request)
 
 	if len(request.MediaID) == 0 {
-		server.sendError(w, fmt.Errorf("no id provided"))
+		sendError(w, fmt.Errorf("no id provided"))
+		return
 	}
 
 	var response unmountResponse
@@ -101,10 +105,10 @@ func (server *Server) unmount(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		response.Success = false
 		response.Message = err.Error()
-		server.sendResponse(w, http.StatusBadRequest, response)
+		sendResponse(w, http.StatusBadRequest, response)
 		return
 	}
 
 	response.Success = true
-	server.sendResponse(w, http.StatusOK, response)
+	sendResponse(w, http.StatusOK, response)
 }

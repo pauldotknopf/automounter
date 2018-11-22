@@ -43,15 +43,16 @@ func (server *Server) leases(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.Success = true
-	server.sendResponse(w, http.StatusOK, response)
+	sendResponse(w, http.StatusOK, response)
 }
 
 func (server *Server) leaseCreate(w http.ResponseWriter, r *http.Request) {
 	var request leaseCreateRequest
-	server.getRequestBody(r, &request)
+	getRequestBody(r, &request)
 
 	if len(request.MediaID) == 0 {
-		server.sendError(w, fmt.Errorf("no media id provided"))
+		sendError(w, fmt.Errorf("no media id provided"))
+		return
 	}
 
 	var response leaseCreateResponse
@@ -60,22 +61,23 @@ func (server *Server) leaseCreate(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		response.Success = false
 		response.Message = err.Error()
-		server.sendResponse(w, http.StatusBadRequest, response)
+		sendResponse(w, http.StatusBadRequest, response)
 		return
 	}
 
 	response.Success = true
 	response.LeaseID = lease.ID()
 	response.MountPath = lease.MountPath()
-	server.sendResponse(w, http.StatusOK, response)
+	sendResponse(w, http.StatusOK, response)
 }
 
 func (server *Server) leaseRelease(w http.ResponseWriter, r *http.Request) {
 	var request leaseReleaseRequest
-	server.getRequestBody(r, &request)
+	getRequestBody(r, &request)
 
 	if len(request.LeaseID) == 0 {
-		server.sendError(w, fmt.Errorf("no lease id provided"))
+		sendError(w, fmt.Errorf("no lease id provided"))
+		return
 	}
 
 	var response leaseReleaseResponse
@@ -84,10 +86,10 @@ func (server *Server) leaseRelease(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		response.Success = false
 		response.Message = err.Error()
-		server.sendResponse(w, http.StatusBadRequest, response)
+		sendResponse(w, http.StatusBadRequest, response)
 		return
 	}
 
 	response.Success = true
-	server.sendResponse(w, http.StatusOK, response)
+	sendResponse(w, http.StatusOK, response)
 }
