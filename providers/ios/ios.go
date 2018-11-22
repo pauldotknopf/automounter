@@ -69,6 +69,9 @@ func (s *iosProvider) Start(ctx context.Context) error {
 }
 
 func (s *iosProvider) GetMedia() []providers.Media {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
 	result := make([]providers.Media, 0)
 	for _, device := range s.devices {
 		result = append(result, device)
@@ -262,7 +265,7 @@ func (s *iosProvider) unmount(id string) error {
 			s.mounts = append(s.mounts[:mountIndex], s.mounts[mountIndex+1:]...)
 
 			// Now, let's try to unmount is.
-			cmd := exec.Command("fusermount", "-u", mount.path)
+			cmd := exec.Command("fusermount", "-u", "-z", mount.path)
 			err := cmd.Run()
 			if err != nil {
 				return err
