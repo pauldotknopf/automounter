@@ -59,12 +59,8 @@ func CreateOptions(server string, share string, folder string, security string, 
 
 	if result.Secure {
 		if len(result.Username) == 0 {
-			return result, fmt.Errorf("a secured connection cannot be made without a password")
+			return result, fmt.Errorf("a secured connection cannot be made without a username")
 		}
-	} else {
-		result.Username = ""
-		result.Password = ""
-		result.Domain = ""
 	}
 
 	// Build a hash of all the parameters
@@ -113,7 +109,7 @@ func (s Options) MountCommand(mountPoint string) string {
 		opts.WriteString(fmt.Sprintf("sec=%s,", s.Security))
 	}
 
-	opts.WriteString("rw ")
+	opts.WriteString("noperm,rw ")
 
 	opts.WriteString(fmt.Sprintf("//%s/%s %s", s.Server, s.Share, mountPoint))
 
@@ -122,5 +118,5 @@ func (s Options) MountCommand(mountPoint string) string {
 
 // UnmountCommand .
 func (s Options) UnmountCommand(mountPoint string) string {
-	return fmt.Sprintf("sudo umount %s", mountPoint)
+	return fmt.Sprintf("sudo umount -l %s", mountPoint)
 }
