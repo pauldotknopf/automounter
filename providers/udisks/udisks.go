@@ -101,6 +101,9 @@ func (s *udisksProvider) Start(ctx context.Context) error {
 }
 
 func (s *udisksProvider) GetMedia() []providers.Media {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
 	result := make([]providers.Media, 0)
 	for _, media := range s.media {
 		result = append(result, media)
