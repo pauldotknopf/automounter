@@ -13,25 +13,25 @@ func init() {
 
 // GetTmpMountPath returns a tmp path, suitable for mounting
 func GetTmpMountPath() (string, error) {
-	exists, err := PathExists("/run/mount")
+	exists, err := PathExists("/run/automounter")
 	if err != nil {
 		return "", err
 	}
 	if !exists {
-		err = os.Mkdir("/run/mount", 0755)
+		err = os.Mkdir("/run/automounter", 0755)
 		if err != nil {
 			return "", err
 		}
 	}
 
 	// Make our tmp directory
-	path := fmt.Sprintf("/run/mount/%s", RandString(5))
+	path := fmt.Sprintf("/run/automounter/%s", RandString(5))
 	exists, err = PathExists(path)
 	if err != nil {
 		return "", err
 	}
 	for exists {
-		path = fmt.Sprintf("/run/mount/%s", RandString(5))
+		path = fmt.Sprintf("/run/automounter/%s", RandString(5))
 		exists, err = PathExists(path)
 		if err != nil {
 			return "", err
