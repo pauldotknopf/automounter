@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/coreos/go-systemd/daemon"
 	"github.com/coreos/go-systemd/journal"
 	"github.com/sirupsen/logrus"
 	"github.com/wercker/journalhook"
@@ -71,7 +72,10 @@ func main() {
 	// Start the web API.
 	eg.Go(func() error {
 		server := web.Create(leaser, smbProvider)
-		serverErr := server.Listen(ctx, 3000)
+		serverErr := server.Listen(ctx, 3000, func() {
+			// We have started listening for requests.
+			daemon.SdNotify(false, "READY=1")
+		})
 		if serverErr != nil {
 			cancel()
 			return serverErr

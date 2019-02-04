@@ -1,5 +1,5 @@
 
-.PHONY: ci_deps
+.PHONY: ci_deps vendor build
 
 default: build
 

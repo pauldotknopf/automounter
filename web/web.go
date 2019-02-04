@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -28,7 +29,7 @@ func Create(leaser leaser.Leaser, smbProvider smb.Provider) *Server {
 }
 
 // Listen Start listening
-func (server *Server) Listen(ctx context.Context, port int) error {
+func (server *Server) Listen(ctx context.Context, port int, started func()) error {
 	var router = mux.NewRouter()
 	router.HandleFunc("/media", server.media).Methods("GET")
 	router.HandleFunc("/mount", server.mount).Methods("POST")
@@ -47,14 +48,23 @@ func (server *Server) Listen(ctx context.Context, port int) error {
 		router.HandleFunc("/smb/remove", server.smbRemove).Methods("POST")
 	}
 
-	h := &http.Server{Addr: fmt.Sprintf(":%d", port), Handler: router}
+	l, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		return err
+	}
+
+	h := &http.Server{Handler: router}
 
 	go func() {
 		<-ctx.Done()
 		h.Shutdown(ctx)
 	}()
 
-	err := h.ListenAndServe()
+	if started != nil {
+		started()
+	}
+
+	err = h.Serve(l)
 	if err == http.ErrServerClosed {
 		return nil
 	}
