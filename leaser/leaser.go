@@ -157,7 +157,8 @@ func (s *leaser) cleanLeases() error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	for mediaIndex, media := range s.media {
+	for mediaIndex := 0; mediaIndex < len(s.media); mediaIndex++ {
+		media := s.media[mediaIndex]
 		if len(media.leases) == 0 {
 			// This mounted item currently has no leases.
 			// Let's see if it has been closed for enough
@@ -169,6 +170,10 @@ func (s *leaser) cleanLeases() error {
 				err := media.MountSession.Release()
 				// Regardless of if it error'd or not, let's remove it.
 				s.media = append(s.media[:mediaIndex], s.media[mediaIndex+1:]...)
+				// we deleted the current entry, so the "next" entry is actually at this same
+				// index, meaning we need the next iteration of the for loop to look at the same
+				// index... so we have to decrement mediaIndex by one
+				mediaIndex--
 				if err != nil {
 					return err
 				}
