@@ -25,8 +25,8 @@ func sendError(w http.ResponseWriter, err error) {
 }
 
 func sendResponse(w http.ResponseWriter, statusCode int, response interface{}) {
-	w.WriteHeader(statusCode)
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
 
 	j, _ := json.Marshal(response)
 	io.WriteString(w, string(j))
