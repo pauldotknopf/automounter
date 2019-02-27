@@ -15,6 +15,7 @@ type MediaProvider interface {
 	Name() string
 	Start(context.Context) error
 	GetMedia() []Media
+	GetMediaByID(id string) Media
 	Mount(id string) (MountSession, error)
 	Unmount(id string) error
 	MediaAddded() (<-chan Media, func())

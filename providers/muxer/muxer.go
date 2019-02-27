@@ -52,6 +52,16 @@ func (s *muxer) GetMedia() []providers.Media {
 	return result
 }
 
+func (s *muxer) GetMediaByID(id string) providers.Media {
+	for _, provider := range s.p {
+		res := provider.GetMediaByID(id)
+		if res != nil {
+			return res
+		}
+	}
+	return nil
+}
+
 func (s *muxer) Mount(id string) (providers.MountSession, error) {
 	for _, provider := range s.p {
 		session, err := provider.Mount(id)

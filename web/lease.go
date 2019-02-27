@@ -16,8 +16,9 @@ type leaseCreateRequest struct {
 
 type leaseCreateResponse struct {
 	genericResponse
-	MountPath string `json:"mountPath"`
-	LeaseID   string `json:"leaseId"`
+	Media     map[string]interface{} `json:"media"`
+	MountPath string                 `json:"mountPath"`
+	LeaseID   string                 `json:"leaseId"`
 }
 
 type leaseReleaseRequest struct {
@@ -55,7 +56,14 @@ func (server *Server) leaseCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var media = server.leaser.MediaProvider().GetMediaByID(request.MediaID)
+	if media == nil {
+		sendError(w, fmt.Errorf("no media found with the given id"))
+		return
+	}
+
 	var response leaseCreateResponse
+	response.Media = convertMediaToJSON(media)
 
 	lease, err := server.leaser.Lease(request.MediaID)
 	if err != nil {

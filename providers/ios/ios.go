@@ -79,6 +79,17 @@ func (s *iosProvider) GetMedia() []providers.Media {
 	return result
 }
 
+func (s *iosProvider) GetMediaByID(id string) providers.Media {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	for _, device := range s.devices {
+		if device.ID() == id {
+			return device
+		}
+	}
+	return nil
+}
+
 func (s *iosProvider) Mount(id string) (providers.MountSession, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()

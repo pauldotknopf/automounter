@@ -111,6 +111,17 @@ func (s *udisksProvider) GetMedia() []providers.Media {
 	return result
 }
 
+func (s *udisksProvider) GetMediaByID(id string) providers.Media {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	for _, media := range s.media {
+		if media.ID() == id {
+			return media
+		}
+	}
+	return nil
+}
+
 func (s *udisksProvider) Mount(id string) (providers.MountSession, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
