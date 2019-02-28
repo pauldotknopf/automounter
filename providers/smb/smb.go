@@ -12,13 +12,11 @@ import (
 
 	"github.com/olebedev/emitter"
 
-	"github.com/godbus/dbus"
 	"github.com/pauldotknopf/automounter/helpers"
 	"github.com/pauldotknopf/automounter/providers"
 )
 
 type smbProvider struct {
-	conn   *dbus.Conn
 	mutex  sync.Mutex
 	media  []*smbMedia
 	mounts []*smbMount
@@ -37,12 +35,6 @@ type Provider interface {
 func Create() (Provider, error) {
 	p := &smbProvider{}
 
-	conn, err := dbus.SystemBus()
-	if err != nil {
-		return nil, err
-	}
-
-	p.conn = conn
 	p.emit = &emitter.Emitter{}
 	p.emit.Use("*", emitter.Void)
 
