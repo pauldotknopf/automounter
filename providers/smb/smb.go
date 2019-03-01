@@ -13,6 +13,7 @@ import (
 	"github.com/olebedev/emitter"
 
 	"github.com/pauldotknopf/automounter/helpers"
+	"github.com/pauldotknopf/automounter/leaser"
 	"github.com/pauldotknopf/automounter/providers"
 )
 
@@ -29,6 +30,7 @@ type Provider interface {
 	TestConnection(options Options) error
 	AddMedia(options Options) (providers.Media, error)
 	RemoveMedia(mediaID string) error
+	DynamicLease(options Options, l leaser.Leaser) (leaser.Lease, providers.Media, error)
 }
 
 // Create a udisks block device media provider
@@ -79,7 +81,7 @@ func (s *smbProvider) Mount(id string) (providers.MountSession, error) {
 	// Check to see if the device is already mounted
 	for _, mount := range s.mounts {
 		if mount.id == id {
-			return &smbMount{id, mount.mountPath, mount.options, s}, nil
+			return &smbMount{id, mount.mountPath, mount.options, s, false}, nil
 		}
 	}
 
@@ -87,30 +89,11 @@ func (s *smbProvider) Mount(id string) (providers.MountSession, error) {
 	for _, media := range s.media {
 		if media.id == id {
 			// We are trying to mount this smb media
-			mount := &smbMount{}
-			mount.id = id
-			mountPath, err := helpers.GetTmpMountPath()
+			mount, err := s.mount(media)
 			if err != nil {
 				return nil, err
 			}
-			mount.mountPath = mountPath
-			mount.options = media.options
-			mount.provider = s
-
-			output, err := run(media.options.MountCommand(mountPath))
-			if err != nil {
-				// We couldn't mount the smb connection.
-				os.RemoveAll(mountPath)
-				logrus.Warningf("couldn't mount smb connection %s: %s: %+v", media.DisplayName(), output, err)
-				output = extractErrorsFromMountOutput(output)
-				if len(output) == 0 {
-					return nil, fmt.Errorf("could not mount")
-				}
-				return nil, fmt.Errorf(output)
-			}
-
 			s.mounts = append(s.mounts, mount)
-
 			return mount, nil
 		}
 	}
@@ -125,20 +108,11 @@ func (s *smbProvider) Unmount(id string) error {
 	// Check to see if it is already mounted
 	for mountIndex, mount := range s.mounts {
 		if mount.id == id {
-			output, err := run(mount.options.UnmountCommand(mount.mountPath))
+			err := mount.unmount()
 			if err != nil {
-				logrus.Errorf("couldn't unmount smb directory %s: %+v: %s", mount.mountPath, err, output)
-				return fmt.Errorf("couldn't unmount smb directory")
+				s.mounts = append(s.mounts[:mountIndex], s.mounts[mountIndex+1:]...)
 			}
-
-			// Since it was unmounted, let's remove the mount from our collection
-			s.mounts = append(s.mounts[:mountIndex], s.mounts[mountIndex+1:]...)
-
-			err = os.RemoveAll(mount.mountPath)
-			if err != nil {
-				logrus.Warnf("couldn't remove mount path %s after unmounting: %+v", mount.mountPath, err)
-			}
-			return nil
+			return err
 		}
 	}
 
@@ -209,9 +183,7 @@ func (s *smbProvider) AddMedia(options Options) (providers.Media, error) {
 	}
 
 	// Add it as a new item.
-	media := &smbMedia{}
-	media.id = fmt.Sprintf("smb-%s", options.Hash)
-	media.options = options
+	media := s.buildMedia(options)
 	s.media = append(s.media, media)
 	s.emit.Emit("mediaAdded", media)
 
@@ -241,6 +213,21 @@ func (s *smbProvider) RemoveMedia(mediaID string) error {
 	}
 
 	return providers.ErrIDNotFound
+}
+
+func (s *smbProvider) DynamicLease(options Options, l leaser.Leaser) (leaser.Lease, providers.Media, error) {
+	media := s.buildMedia(options)
+	lease, err := l.LeaseDynamic(media.ID(), func() (providers.MountSession, error) {
+		result, err := s.mount(media)
+		if result != nil {
+			result.isDynamic = true
+		}
+		return result, err
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return lease, media, nil
 }
 
 func extractErrorsFromMountOutput(output string) string {

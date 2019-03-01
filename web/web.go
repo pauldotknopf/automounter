@@ -46,6 +46,7 @@ func (server *Server) Listen(ctx context.Context, port int, started func()) erro
 		router.HandleFunc("/smb/test", server.smbTest).Methods("POST")
 		router.HandleFunc("/smb/add", server.smbAdd).Methods("POST")
 		router.HandleFunc("/smb/remove", server.smbRemove).Methods("POST")
+		router.HandleFunc("/smb/dynamicLease", server.smbDynamicLease).Methods("POST")
 	}
 
 	l, err := net.Listen("tcp", fmt.Sprintf(":%d", port))

@@ -5,9 +5,13 @@ type smbMount struct {
 	mountPath string
 	options   Options
 	provider  *smbProvider
+	isDynamic bool
 }
 
 func (s *smbMount) Release() error {
+	if s.isDynamic {
+		return s.unmount()
+	}
 	return s.provider.Unmount(s.id)
 }
 

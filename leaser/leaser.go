@@ -23,6 +23,7 @@ type Leaser interface {
 	MediaProvider() providers.MediaProvider
 	Leases() []Lease
 	Lease(mediaID string) (Lease, error)
+	LeaseDynamic(mediaID string, buildSession func() (providers.MountSession, error)) (Lease, error)
 	Release(leaseID string) error
 	Process(ctx context.Context) error
 }
@@ -60,6 +61,12 @@ func (s *leaser) Leases() []Lease {
 }
 
 func (s *leaser) Lease(mediaID string) (Lease, error) {
+	return s.LeaseDynamic(mediaID, func() (providers.MountSession, error) {
+		return s.mediaProvider.Mount(mediaID)
+	})
+}
+
+func (s *leaser) LeaseDynamic(mediaID string, buildSession func() (providers.MountSession, error)) (Lease, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -77,7 +84,7 @@ func (s *leaser) Lease(mediaID string) (Lease, error) {
 	}
 
 	// This is lease for a new media item.
-	mountSession, err := s.mediaProvider.Mount(mediaID)
+	mountSession, err := buildSession()
 	if err != nil {
 		return nil, err
 	}

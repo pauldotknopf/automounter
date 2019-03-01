@@ -44,6 +44,14 @@ type smbRemoveResponse struct {
 	genericResponse
 }
 
+type smbDynamicLeaseRequest struct {
+	smbTestRequest
+}
+
+type smbDynamicLeaseResponse struct {
+	leaseCreateResponse
+}
+
 func (server *Server) smb(w http.ResponseWriter, r *http.Request) {
 	var response smbResponse
 	response.Success = true
@@ -129,6 +137,44 @@ func (server *Server) smbRemove(w http.ResponseWriter, r *http.Request) {
 	} else {
 		response.Success = true
 	}
+
+	sendResponse(w, http.StatusOK, response)
+}
+
+func (server *Server) smbDynamicLease(w http.ResponseWriter, r *http.Request) {
+
+	var request smbDynamicLeaseRequest
+	var response smbDynamicLeaseResponse
+
+	err := getRequestBody(r, &request)
+	if err != nil {
+		sendError(w, err)
+		return
+	}
+
+	options, err := smb.CreateOptions(request.Server, request.Share, request.Folder, request.Security, request.Secure, request.Domain, request.Username, request.Password)
+	if err != nil {
+		response.Message = err.Error()
+		response.Success = false
+		sendResponse(w, http.StatusOK, response)
+		return
+	}
+
+	// Build the media so that we can get the "id" to build the dynamic lease.
+	lease, media, err := server.smbProvider.DynamicLease(options,
+		server.leaser)
+
+	if err != nil {
+		response.Success = false
+		response.Message = err.Error()
+		sendResponse(w, http.StatusOK, response)
+		return
+	}
+
+	response.Media = convertMediaToJSON(media)
+	response.Success = true
+	response.LeaseID = lease.ID()
+	response.MountPath = lease.MountPath()
 
 	sendResponse(w, http.StatusOK, response)
 }
