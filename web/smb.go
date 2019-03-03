@@ -14,7 +14,6 @@ type smbResponse struct {
 type smbTestRequest struct {
 	Server   string `json:"server"`
 	Share    string `json:"share"`
-	Folder   string `json:"folder"`
 	Security string `json:"security"`
 	Secure   bool   `json:"secure"`
 	Domain   string `json:"domain"`
@@ -73,7 +72,7 @@ func (server *Server) smbTest(w http.ResponseWriter, r *http.Request) {
 	// The request was a success (but maybe not the smb test)
 	response.Success = true
 
-	options, err := smb.CreateOptions(request.Server, request.Share, request.Folder, request.Security, request.Secure, request.Domain, request.Username, request.Password)
+	options, err := smb.CreateOptions(request.Server, request.Share, request.Security, request.Secure, request.Domain, request.Username, request.Password)
 	if err != nil {
 		sendError(w, err)
 		return
@@ -101,7 +100,7 @@ func (server *Server) smbAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	options, err := smb.CreateOptions(request.Server, request.Share, request.Folder, request.Security, request.Secure, request.Domain, request.Username, request.Password)
+	options, err := smb.CreateOptions(request.Server, request.Share, request.Security, request.Secure, request.Domain, request.Username, request.Password)
 	if err != nil {
 		response.Message = err.Error()
 		response.Success = false
@@ -152,7 +151,7 @@ func (server *Server) smbDynamicLease(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	options, err := smb.CreateOptions(request.Server, request.Share, request.Folder, request.Security, request.Secure, request.Domain, request.Username, request.Password)
+	options, err := smb.CreateOptions(request.Server, request.Share, request.Security, request.Secure, request.Domain, request.Username, request.Password)
 	if err != nil {
 		response.Message = err.Error()
 		response.Success = false

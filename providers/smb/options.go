@@ -11,7 +11,6 @@ import (
 type Options struct {
 	Server   string
 	Share    string
-	Folder   string
 	Security string
 	Secure   bool
 	Domain   string
@@ -21,11 +20,10 @@ type Options struct {
 }
 
 // CreateOptions .
-func CreateOptions(server string, share string, folder string, security string, secure bool, domain string, username string, password string) (Options, error) {
+func CreateOptions(server string, share string, security string, secure bool, domain string, username string, password string) (Options, error) {
 	var result Options
 	result.Server = server
 	result.Share = share
-	result.Folder = folder
 	result.Security = security
 	result.Secure = secure
 	result.Domain = domain
@@ -67,7 +65,6 @@ func CreateOptions(server string, share string, folder string, security string, 
 	var hashBytes bytes.Buffer
 	hashBytes.Write([]byte(result.Server))
 	hashBytes.Write([]byte(result.Share))
-	hashBytes.Write([]byte(result.Folder))
 	hashBytes.Write([]byte(result.Security))
 	if result.Secure {
 		hashBytes.WriteByte(1)

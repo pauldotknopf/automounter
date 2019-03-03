@@ -22,7 +22,6 @@ func (s *smbMedia) Properties() map[string]string {
 
 	result["server"] = s.options.Server
 	result["share"] = s.options.Share
-	result["folder"] = s.options.Folder
 	result["security"] = s.options.Security
 	if s.options.Secure {
 		result["secure"] = "true"
