@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -e
-sudo apt-get install -y samba
+sudo apt-get install -y samba cifs-utils
 sudo smbpasswd -a pknopf
 sudo mkdir -p /var/lib/smb-custom
 sudo chmod 777 /var/lib/smb-custom

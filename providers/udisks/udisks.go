@@ -169,7 +169,9 @@ func (s *udisksProvider) Unmount(id string) error {
 	for _, media := range s.media {
 		if media.ID() == id {
 			obj := s.conn.Object("org.freedesktop.UDisks2", media.path)
-			var params map[string]dbus.Variant
+			var params = map[string]dbus.Variant{
+				"force": dbus.MakeVariant(true),
+			}
 			err := obj.Call("org.freedesktop.UDisks2.Filesystem.Unmount", 0, params).Store()
 			if err != nil {
 				if dbusError, ok := err.(dbus.Error); ok {

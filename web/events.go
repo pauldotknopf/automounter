@@ -1,7 +1,6 @@
 package web
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -48,5 +47,4 @@ func (server *Server) events(w http.ResponseWriter, r *http.Request) {
 	removedChannelCancel()
 
 	wg.Wait()
-	fmt.Println("closed...")
 }
