@@ -123,6 +123,8 @@ func (s *iosProvider) Mount(id string) (providers.MountSession, error) {
 
 			s.mounts = append(s.mounts, mount)
 
+			s.emit.Emit("mediaMounted", id)
+
 			return mount, nil
 		}
 	}
@@ -298,6 +300,10 @@ func (s *iosProvider) unmount(id string) error {
 			// This item is currently mounted.
 			// First, remove it from the array.
 			s.mounts = append(s.mounts[:mountIndex], s.mounts[mountIndex+1:]...)
+
+			defer func() {
+				s.emit.Emit("mediaUnmounted", id)
+			}()
 
 			// Now, let's try to unmount is.
 			cmd := exec.Command("fusermount", "-u", "-z", mount.path)
