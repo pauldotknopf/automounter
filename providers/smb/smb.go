@@ -94,6 +94,7 @@ func (s *smbProvider) Mount(id string) (providers.MountSession, error) {
 				return nil, err
 			}
 			s.mounts = append(s.mounts, mount)
+			s.emit.Emit("mediaMounted", id)
 			return mount, nil
 		}
 	}
@@ -109,8 +110,9 @@ func (s *smbProvider) Unmount(id string) error {
 	for mountIndex, mount := range s.mounts {
 		if mount.id == id {
 			err := mount.unmount()
-			if err != nil {
+			if err == nil {
 				s.mounts = append(s.mounts[:mountIndex], s.mounts[mountIndex+1:]...)
+				s.emit.Emit("mediaUnmounted", id)
 			}
 			return err
 		}
