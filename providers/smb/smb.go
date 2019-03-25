@@ -143,6 +143,30 @@ func (s *smbProvider) MediaRemoved() (<-chan string, func()) {
 	return out, cancel
 }
 
+func (s *smbProvider) MediaMounted() (<-chan string, func()) {
+	out := make(chan string)
+	in := s.emit.On("mediaMounted", func(event *emitter.Event) {
+		out <- event.String(0)
+	})
+	cancel := func() {
+		s.emit.Off("mediaMounted", in)
+		close(out)
+	}
+	return out, cancel
+}
+
+func (s *smbProvider) MediaUnmounted() (<-chan string, func()) {
+	out := make(chan string)
+	in := s.emit.On("mediaUnmounted", func(event *emitter.Event) {
+		out <- event.String(0)
+	})
+	cancel := func() {
+		s.emit.Off("mediaUnmounted", in)
+		close(out)
+	}
+	return out, cancel
+}
+
 func (s *smbProvider) TestConnection(options Options) error {
 	tmpMountPath, err := helpers.GetTmpMountPath()
 	if err != nil {

@@ -1,17 +1,13 @@
 package udisks
 
-import (
-	"github.com/godbus/dbus"
-)
-
 type udisksMountSession struct {
-	path      dbus.ObjectPath
+	media     *udisksMedia
 	mountPath string
 	provider  *udisksProvider
 }
 
 func (s *udisksMountSession) Release() error {
-	return s.provider.Unmount(string(s.path))
+	return s.provider.Unmount(s.media.ID())
 }
 
 func (s *udisksMountSession) Location() string {

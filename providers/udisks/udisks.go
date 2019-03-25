@@ -16,7 +16,7 @@ type udisksProvider struct {
 	conn  *dbus.Conn
 	mutex sync.Mutex
 	media []*udisksMedia
-	emit  *emitter.Emitter
+	Emit  *emitter.Emitter
 }
 
 // Create a udisks block device media provider
@@ -29,8 +29,8 @@ func Create() (providers.MediaProvider, error) {
 	}
 
 	p.conn = conn
-	p.emit = &emitter.Emitter{}
-	p.emit.Use("*", emitter.Void)
+	p.Emit = &emitter.Emitter{}
+	p.Emit.Use("*", emitter.Void)
 
 	return p, nil
 }
@@ -79,6 +79,8 @@ func (s *udisksProvider) Start(ctx context.Context) error {
 		}
 
 		path := sig.Body[0].(dbus.ObjectPath)
+
+		log.Println(sig.Name)
 
 		switch sig.Name {
 		case "org.freedesktop.DBus.ObjectManager.InterfacesAdded":
@@ -142,8 +144,11 @@ func (s *udisksProvider) Mount(id string) (providers.MountSession, error) {
 						if len(v) == 0 {
 							return nil, fmt.Errorf("mount indicated it was already mounted, but couldn't find the mount")
 						}
+
+						s.Emit.Emit("mediaMounted", media.ID())
+
 						session := &udisksMountSession{}
-						session.path = media.path
+						session.media = media
 						session.mountPath = v[0]
 						session.provider = s
 						return session, nil
@@ -151,8 +156,11 @@ func (s *udisksProvider) Mount(id string) (providers.MountSession, error) {
 				}
 				return nil, err
 			}
+
+			s.Emit.Emit("mediaMounted", media.ID())
+
 			session := &udisksMountSession{}
-			session.path = media.path
+			session.media = media
 			session.mountPath = location
 			session.provider = s
 			return session, nil
@@ -168,6 +176,13 @@ func (s *udisksProvider) Unmount(id string) error {
 
 	for _, media := range s.media {
 		if media.ID() == id {
+			var wasUnmounted = false
+			defer func() {
+				if wasUnmounted {
+					s.Emit.Emit("mediaUnmounted", media.ID())
+				}
+			}()
+
 			obj := s.conn.Object("org.freedesktop.UDisks2", media.path)
 			var params = map[string]dbus.Variant{
 				"force": dbus.MakeVariant(true),
@@ -176,11 +191,13 @@ func (s *udisksProvider) Unmount(id string) error {
 			if err != nil {
 				if dbusError, ok := err.(dbus.Error); ok {
 					if dbusError.Name == "org.freedesktop.UDisks2.Error.NotMounted" {
+						wasUnmounted = true
 						return nil
 					}
 				}
 				return err
 			}
+			wasUnmounted = true
 			return nil
 		}
 	}
@@ -190,11 +207,11 @@ func (s *udisksProvider) Unmount(id string) error {
 
 func (s *udisksProvider) MediaAddded() (<-chan providers.Media, func()) {
 	out := make(chan providers.Media)
-	in := s.emit.On("mediaAdded", func(event *emitter.Event) {
+	in := s.Emit.On("mediaAdded", func(event *emitter.Event) {
 		out <- event.Args[0].(providers.Media)
 	})
 	cancel := func() {
-		s.emit.Off("mediaAdded", in)
+		s.Emit.Off("mediaAdded", in)
 		close(out)
 	}
 	return out, cancel
@@ -202,11 +219,35 @@ func (s *udisksProvider) MediaAddded() (<-chan providers.Media, func()) {
 
 func (s *udisksProvider) MediaRemoved() (<-chan string, func()) {
 	out := make(chan string)
-	in := s.emit.On("mediaRemoved", func(event *emitter.Event) {
+	in := s.Emit.On("mediaRemoved", func(event *emitter.Event) {
 		out <- event.String(0)
 	})
 	cancel := func() {
-		s.emit.Off("mediaRemoved", in)
+		s.Emit.Off("mediaRemoved", in)
+		close(out)
+	}
+	return out, cancel
+}
+
+func (s *udisksProvider) MediaMounted() (<-chan string, func()) {
+	out := make(chan string)
+	in := s.Emit.On("mediaMounted", func(event *emitter.Event) {
+		out <- event.String(0)
+	})
+	cancel := func() {
+		s.Emit.Off("mediaMounted", in)
+		close(out)
+	}
+	return out, cancel
+}
+
+func (s *udisksProvider) MediaUnmounted() (<-chan string, func()) {
+	out := make(chan string)
+	in := s.Emit.On("mediaUnmounted", func(event *emitter.Event) {
+		out <- event.String(0)
+	})
+	cancel := func() {
+		s.Emit.Off("mediaUnmounted", in)
 		close(out)
 	}
 	return out, cancel
@@ -231,7 +272,7 @@ func (s *udisksProvider) deviceAdded(path dbus.ObjectPath, dBusObject map[string
 					if !s.hasObject(path) {
 						m := &udisksMedia{path, dBusObject}
 						s.media = append(s.media, m)
-						s.emit.Emit("mediaAdded", m)
+						s.Emit.Emit("mediaAdded", m)
 					}
 				}
 			} else {
@@ -249,7 +290,8 @@ func (s *udisksProvider) deviceRemoved(path dbus.ObjectPath) error {
 	for mediaIndex, media := range s.media {
 		if media.path == path {
 			s.media = append(s.media[:mediaIndex], s.media[mediaIndex+1:]...)
-			s.emit.Emit("mediaRemoved", string(path))
+			s.Emit.Emit("mediaUnmounted", string(path))
+			s.Emit.Emit("mediaRemoved", string(path))
 			return nil
 		}
 	}

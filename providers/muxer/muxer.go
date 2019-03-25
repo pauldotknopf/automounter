@@ -164,3 +164,80 @@ func (s *muxer) MediaRemoved() (<-chan string, func()) {
 
 	return out, cancel
 }
+func (s *muxer) MediaMounted() (<-chan string, func()) {
+	out := make(chan string)
+
+	type pairStruct struct {
+		in   <-chan string
+		canc func()
+	}
+	pairs := make([]pairStruct, 0)
+
+	var wg sync.WaitGroup
+
+	cancel := func() {
+		for _, p := range pairs {
+			p.canc()
+		}
+		wg.Wait()
+		close(out)
+	}
+
+	for _, p := range s.p {
+		mediaMountedChannel, mediaMountedCancel := p.MediaMounted()
+		pairs = append(pairs, pairStruct{mediaMountedChannel, mediaMountedCancel})
+	}
+
+	// Start goroutines for all the inbound channels
+	// to send them to the single outbound
+	for _, p := range pairs {
+		wg.Add(1)
+		go func(pair pairStruct) {
+			defer wg.Done()
+			for m := range pair.in {
+				out <- m
+			}
+		}(p)
+	}
+
+	return out, cancel
+}
+
+func (s *muxer) MediaUnmounted() (<-chan string, func()) {
+	out := make(chan string)
+
+	type pairStruct struct {
+		in   <-chan string
+		canc func()
+	}
+	pairs := make([]pairStruct, 0)
+
+	var wg sync.WaitGroup
+
+	cancel := func() {
+		for _, p := range pairs {
+			p.canc()
+		}
+		wg.Wait()
+		close(out)
+	}
+
+	for _, p := range s.p {
+		mediaUnmountedChannel, mediaUnmountedCancel := p.MediaUnmounted()
+		pairs = append(pairs, pairStruct{mediaUnmountedChannel, mediaUnmountedCancel})
+	}
+
+	// Start goroutines for all the inbound channels
+	// to send them to the single outbound
+	for _, p := range pairs {
+		wg.Add(1)
+		go func(pair pairStruct) {
+			defer wg.Done()
+			for m := range pair.in {
+				out <- m
+			}
+		}(p)
+	}
+
+	return out, cancel
+}
