@@ -108,7 +108,7 @@ func (s Options) MountCommand(mountPoint string) string {
 
 	opts.WriteString("noperm,rw ")
 
-	opts.WriteString(fmt.Sprintf("//%s/%s %s", s.Server, s.Share, mountPoint))
+	opts.WriteString(fmt.Sprintf("\"//%s/%s\" %s", s.Server, s.Share, mountPoint))
 
 	return fmt.Sprintf("sudo mount -t cifs -o %s", opts.String())
 }
