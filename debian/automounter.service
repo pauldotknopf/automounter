@@ -1,0 +1,6 @@
+[Unit]
+Description=A daemon for auto-mounting USB devices.
+Wants=usbmuxd.service
+
+[Service]
+ExecStart=/usr/bin/automounter

@@ -1,0 +1,20 @@
+Source: automounter
+Section: unknown
+Priority: optional
+Maintainer: Paul Knopf <pauldotknopf@gmail.com>
+Build-Depends: debhelper (>= 10),
+  dh-golang,
+  golang-go,
+  libimobiledevice-dev
+Standards-Version: 4.1.2
+Homepage: https://github.com/pauldotknopf/automounter.git
+
+Package: automounter
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, libimobiledevice6, usbmuxd, cifs-utils
+Description: Auto mounter usb/ios devices.
+
+Package: python3-automounter
+Architecture: any
+Depends: automounter, python3-requests
+Description: Python client to interact with automounter.
