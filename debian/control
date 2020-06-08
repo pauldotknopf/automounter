@@ -11,7 +11,7 @@ Homepage: https://github.com/pauldotknopf/automounter.git
 
 Package: automounter
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, libimobiledevice6, usbmuxd, cifs-utils
+Depends: ${shlibs:Depends}, ${misc:Depends}, libimobiledevice6, usbmuxd, cifs-utils, udisks2
 Description: Auto mounter usb/ios devices.
 
 Package: python3-automounter
