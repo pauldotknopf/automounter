@@ -110,10 +110,10 @@ func (s Options) MountCommand(mountPoint string) string {
 
 	opts.WriteString(fmt.Sprintf("\"//%s/%s\" %s", s.Server, s.Share, mountPoint))
 
-	return fmt.Sprintf("sudo mount -t cifs -o %s", opts.String())
+	return fmt.Sprintf("mount -t cifs -o %s", opts.String())
 }
 
 // UnmountCommand .
 func (s Options) UnmountCommand(mountPoint string) string {
-	return fmt.Sprintf("sudo umount -l %s", mountPoint)
+	return fmt.Sprintf("umount -l %s", mountPoint)
 }
