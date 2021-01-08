@@ -179,7 +179,7 @@ func (s *smbProvider) TestConnection(options Options) error {
 	output, err := run(options.MountCommand(tmpMountPath))
 	if err != nil {
 		// We had an error, let's see if we can get the error from the output
-		logrus.Debugf("error testing mount for %s: %s: %+v", options.FriendlyName(), output, err)
+		logrus.Warnf("error testing mount for %s: %s: %+v", options.FriendlyName(), output, err)
 		output = extractErrorsFromMountOutput(output)
 		if len(output) == 0 {
 			return fmt.Errorf("could not mount")
@@ -189,7 +189,7 @@ func (s *smbProvider) TestConnection(options Options) error {
 
 	output, err = run(options.UnmountCommand(tmpMountPath))
 	if err != nil {
-		logrus.Debugf("error removing mount after test for %s: %s: %+v", options.FriendlyName(), output, err)
+		logrus.Warnf("error removing mount after test for %s: %s: %+v", options.FriendlyName(), output, err)
 	}
 
 	return nil
